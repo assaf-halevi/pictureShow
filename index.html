@@ -33,7 +33,7 @@
             line-height: 80px;
             color: #ff69b4;
             text-align: center;
-            transition: all 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55), opacity 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
             touch-action: none;
             filter: drop-shadow(0 0 8px rgba(255, 105, 180, 0.7));
             user-select: none;
@@ -93,10 +93,10 @@
         resizeCanvas();
 
         class Heart {
-            constructor(x, y, angleOffset) {
+            constructor(x, y, index) {
                 this.x = x;
                 this.y = y;
-                this.angleOffset = angleOffset; // Offset for circular positioning
+                this.index = index;
                 this.speedX = (Math.random() - 0.5) * 3;
                 this.speedY = (Math.random() - 0.5) * 3;
                 this.opacity = 1;
@@ -129,11 +129,17 @@
             update(targetX, targetY) {
                 if (!this.popping) {
                     if (targetX !== null && targetY !== null) {
-                        // Follow finger in a circular pattern
-                        const radius = 100; // Distance from finger
-                        const angle = this.angleOffset + Date.now() * 0.001; // Rotate over time
-                        this.x = targetX + radius * Math.cos(angle);
-                        this.y = targetY + radius * Math.sin(angle);
+                        // Directly follow finger - calculate position based on index to spread hearts out
+                        const spreadFactor = 40; // Distance between hearts
+                        const rowSize = 4; // Hearts per row
+                        
+                        // Calculate row and column based on index
+                        const row = Math.floor(this.index / rowSize);
+                        const col = this.index % rowSize;
+                        
+                        // Offset from touch point
+                        this.x = targetX - spreadFactor + (col * spreadFactor);
+                        this.y = targetY - spreadFactor + (row * spreadFactor);
                     } else {
                         // Default movement when not dragging
                         let newX = this.x + this.speedX;
@@ -172,8 +178,7 @@
         let touchY = null;
 
         function spawnHeart(x, y, index) {
-            const angleOffset = (2 * Math.PI * index) / initialHeartCount; // Space hearts evenly in a circle
-            const newHeart = new Heart(x, y, angleOffset);
+            const newHeart = new Heart(x, y, index);
             hearts.push(newHeart);
             totalHeartsCreated++;
         }
@@ -205,7 +210,11 @@
 
         function gameLoop() {
             hearts = hearts.filter(heart => !heart.popping || heart.opacity > 0);
-            hearts.forEach(heart => heart.update(touchX, touchY));
+            hearts.forEach((heart, index) => {
+                // Update index to maintain proper formation when following finger
+                heart.index = index;
+                heart.update(touchX, touchY);
+            });
 
             const currentTime = Date.now();
             if (currentTime - lastSpawnTime >= spawnInterval && hearts.length < 15 && touchX === null) {
