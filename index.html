@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heart Popper Game</title>
-    <!-- Link to the manifest file for PWA -->
     <link rel="manifest" href="manifest.json">
     <style>
         body {
@@ -52,17 +51,32 @@
             height: 150px;
             font-size: 150px;
             line-height: 150px;
-            color: #ff1493; /* Deep pink */
+            color: #ff1493;
             text-align: center;
             filter: drop-shadow(0 0 12px rgba(255, 20, 147, 0.8));
             cursor: pointer;
-            z-index: 10; /* Ensure it's above other hearts */
+            z-index: 10;
+        }
+
+        /* New pink circle for minimizing */
+        #minimizeCircle {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            background-color: #ff69b4;
+            border-radius: 50%;
+            z-index: 20;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
     <div id="resetHeart">♥</div>
+    <div id="minimizeCircle"></div>
 
     <script>
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -82,11 +96,11 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const resetHeart = document.getElementById('resetHeart');
+        const minimizeCircle = document.getElementById('minimizeCircle');
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // Center the reset heart
             resetHeart.style.left = `${(window.innerWidth - 150) / 2}px`;
             resetHeart.style.top = `${(window.innerHeight - 150) / 2}px`;
         }
@@ -121,7 +135,6 @@
                 this.popping = true;
                 this.element.classList.add('popping');
                 playPopSound();
-                
                 setTimeout(() => {
                     this.element.remove();
                 }, 800);
@@ -170,7 +183,7 @@
         }
 
         function initializeHearts() {
-            hearts.forEach(heart => heart.element.remove()); // Remove existing hearts
+            hearts.forEach(heart => heart.element.remove());
             hearts = [];
             totalHeartsCreated = initialHeartCount;
             for (let i = 0; i < initialHeartCount; i++) {
@@ -178,7 +191,6 @@
             }
         }
 
-        // Reset game when big heart is tapped
         resetHeart.addEventListener('touchstart', (e) => {
             e.preventDefault();
             initializeHearts();
@@ -187,6 +199,7 @@
         window.addEventListener('load', () => {
             resizeCanvas();
             initializeHearts();
+            enterFullScreen(); // Enter full-screen on load
         });
 
         let lastSpawnTime = Date.now();
@@ -213,12 +226,46 @@
             }
         }, { passive: false });
 
-        // Register the service worker for PWA offline functionality
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(() => console.log('Service Worker Registered'))
                 .catch((error) => console.log('Registration failed:', error));
         }
+
+        // Full-screen and minimize functionality
+        function enterFullScreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) { // Safari
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) { // IE11
+                elem.msRequestFullscreen();
+            }
+        }
+
+        function exitFullScreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) { // Safari
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { // IE11
+                document.msExitFullscreen();
+            }
+        }
+
+        // Double-tap to minimize
+        let tapCount = 0;
+        minimizeCircle.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            tapCount++;
+            if (tapCount === 1) {
+                setTimeout(() => { tapCount = 0; }, 300); // Reset after 300ms if no second tap
+            } else if (tapCount === 2) {
+                exitFullScreen();
+                tapCount = 0;
+            }
+        });
     </script>
 </body>
 </html>
