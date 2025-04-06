@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heart Popper Game</title>
     <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
     <style>
         body {
             margin: 0;
@@ -15,7 +16,7 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            touch-action: manipulation;
+            touch-action: none; /* Changed to none for better touch control */
         }
 
         canvas {
@@ -57,26 +58,11 @@
             cursor: pointer;
             z-index: 10;
         }
-
-        /* New pink circle for minimizing */
-        #minimizeCircle {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 40px;
-            height: 40px;
-            background-color: #ff69b4;
-            border-radius: 50%;
-            z-index: 20;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
     <div id="resetHeart">♥</div>
-    <div id="minimizeCircle"></div>
 
     <script>
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -96,7 +82,6 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const resetHeart = document.getElementById('resetHeart');
-        const minimizeCircle = document.getElementById('minimizeCircle');
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -108,9 +93,10 @@
         resizeCanvas();
 
         class Heart {
-            constructor(x, y) {
-                this.x = Math.max(0, Math.min(x, window.innerWidth - 80));
-                this.y = Math.max(0, Math.min(y, window.innerHeight - 80));
+            constructor(x, y, angleOffset) {
+                this.x = x;
+                this.y = y;
+                this.angleOffset = angleOffset; // Offset for circular positioning
                 this.speedX = (Math.random() - 0.5) * 3;
                 this.speedY = (Math.random() - 0.5) * 3;
                 this.opacity = 1;
@@ -140,29 +126,38 @@
                 }, 800);
             }
 
-            update() {
+            update(targetX, targetY) {
                 if (!this.popping) {
-                    let newX = this.x + this.speedX;
-                    let newY = this.y + this.speedY;
+                    if (targetX !== null && targetY !== null) {
+                        // Follow finger in a circular pattern
+                        const radius = 100; // Distance from finger
+                        const angle = this.angleOffset + Date.now() * 0.001; // Rotate over time
+                        this.x = targetX + radius * Math.cos(angle);
+                        this.y = targetY + radius * Math.sin(angle);
+                    } else {
+                        // Default movement when not dragging
+                        let newX = this.x + this.speedX;
+                        let newY = this.y + this.speedY;
 
-                    if (newX <= 0) {
-                        newX = 0;
-                        this.speedX = Math.abs(this.speedX) * 0.8;
-                    } else if (newX >= window.innerWidth - 80) {
-                        newX = window.innerWidth - 80;
-                        this.speedX = -Math.abs(this.speedX) * 0.8;
+                        if (newX <= 0) {
+                            newX = 0;
+                            this.speedX = Math.abs(this.speedX) * 0.8;
+                        } else if (newX >= window.innerWidth - 80) {
+                            newX = window.innerWidth - 80;
+                            this.speedX = -Math.abs(this.speedX) * 0.8;
+                        }
+
+                        if (newY <= 0) {
+                            newY = 0;
+                            this.speedY = Math.abs(this.speedY) * 0.8;
+                        } else if (newY >= window.innerHeight - 80) {
+                            newY = window.innerHeight - 80;
+                            this.speedY = -Math.abs(this.speedY) * 0.8;
+                        }
+
+                        this.x = newX;
+                        this.y = newY;
                     }
-
-                    if (newY <= 0) {
-                        newY = 0;
-                        this.speedY = Math.abs(this.speedY) * 0.8;
-                    } else if (newY >= window.innerHeight - 80) {
-                        newY = window.innerHeight - 80;
-                        this.speedY = -Math.abs(this.speedY) * 0.8;
-                    }
-
-                    this.x = newX;
-                    this.y = newY;
 
                     this.element.style.left = `${this.x}px`;
                     this.element.style.top = `${this.y}px`;
@@ -173,11 +168,12 @@
         let hearts = [];
         const initialHeartCount = 10;
         let totalHeartsCreated = initialHeartCount;
+        let touchX = null;
+        let touchY = null;
 
-        function spawnHeart() {
-            const x = Math.random() * (window.innerWidth - 80);
-            const y = Math.random() * (window.innerHeight - 80);
-            const newHeart = new Heart(x, y);
+        function spawnHeart(x, y, index) {
+            const angleOffset = (2 * Math.PI * index) / initialHeartCount; // Space hearts evenly in a circle
+            const newHeart = new Heart(x, y, angleOffset);
             hearts.push(newHeart);
             totalHeartsCreated++;
         }
@@ -186,8 +182,10 @@
             hearts.forEach(heart => heart.element.remove());
             hearts = [];
             totalHeartsCreated = initialHeartCount;
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
             for (let i = 0; i < initialHeartCount; i++) {
-                spawnHeart();
+                spawnHeart(centerX, centerY, i);
             }
         }
 
@@ -199,7 +197,7 @@
         window.addEventListener('load', () => {
             resizeCanvas();
             initializeHearts();
-            enterFullScreen(); // Enter full-screen on load
+            enterFullScreen();
         });
 
         let lastSpawnTime = Date.now();
@@ -207,11 +205,11 @@
 
         function gameLoop() {
             hearts = hearts.filter(heart => !heart.popping || heart.opacity > 0);
-            hearts.forEach(heart => heart.update());
+            hearts.forEach(heart => heart.update(touchX, touchY));
 
             const currentTime = Date.now();
-            if (currentTime - lastSpawnTime >= spawnInterval && hearts.length < 15) {
-                spawnHeart();
+            if (currentTime - lastSpawnTime >= spawnInterval && hearts.length < 15 && touchX === null) {
+                spawnHeart(window.innerWidth / 2, window.innerHeight / 2, hearts.length);
                 lastSpawnTime = currentTime;
             }
 
@@ -220,10 +218,27 @@
 
         gameLoop();
 
+        // Touch controls for dragging hearts
         document.addEventListener('touchstart', (e) => {
-            if (e.target === canvas) {
+            if (e.target === canvas || e.target.className === 'heart') {
                 e.preventDefault();
+                const touch = e.touches[0];
+                touchX = touch.clientX - 40; // Adjust for heart center
+                touchY = touch.clientY - 40;
             }
+        }, { passive: false });
+
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            touchX = touch.clientX - 40;
+            touchY = touch.clientY - 40;
+        }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchX = null;
+            touchY = null;
         }, { passive: false });
 
         if ('serviceWorker' in navigator) {
@@ -232,40 +247,16 @@
                 .catch((error) => console.log('Registration failed:', error));
         }
 
-        // Full-screen and minimize functionality
         function enterFullScreen() {
             const elem = document.documentElement;
             if (elem.requestFullscreen) {
                 elem.requestFullscreen();
-            } else if (elem.webkitRequestFullscreen) { // Safari
+            } else if (elem.webkitRequestFullscreen) {
                 elem.webkitRequestFullscreen();
-            } else if (elem.msRequestFullscreen) { // IE11
+            } else if (elem.msRequestFullscreen) {
                 elem.msRequestFullscreen();
             }
         }
-
-        function exitFullScreen() {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) { // Safari
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) { // IE11
-                document.msExitFullscreen();
-            }
-        }
-
-        // Double-tap to minimize
-        let tapCount = 0;
-        minimizeCircle.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            tapCount++;
-            if (tapCount === 1) {
-                setTimeout(() => { tapCount = 0; }, 300); // Reset after 300ms if no second tap
-            } else if (tapCount === 2) {
-                exitFullScreen();
-                tapCount = 0;
-            }
-        });
     </script>
 </body>
 </html>
