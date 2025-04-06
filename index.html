@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Popper Game</title>
+    <!-- Link to the manifest file for PWA -->
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            touch-action: manipulation;
+        }
+
+        canvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        .heart {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            font-size: 80px;
+            line-height: 80px;
+            color: #ff69b4;
+            text-align: center;
+            transition: all 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            touch-action: none;
+            filter: drop-shadow(0 0 8px rgba(255, 105, 180, 0.7));
+            user-select: none;
+        }
+
+        .popping {
+            transform: scale(2.5) rotate(720deg);
+            opacity: 0;
+            filter: drop-shadow(0 0 20px rgba(255, 105, 180, 1));
+            color: #ffb6c1;
+        }
+
+        #resetHeart {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            font-size: 150px;
+            line-height: 150px;
+            color: #ff1493; /* Deep pink */
+            text-align: center;
+            filter: drop-shadow(0 0 12px rgba(255, 20, 147, 0.8));
+            cursor: pointer;
+            z-index: 10; /* Ensure it's above other hearts */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="resetHeart">♥</div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playPopSound() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.2);
+        }
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const resetHeart = document.getElementById('resetHeart');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // Center the reset heart
+            resetHeart.style.left = `${(window.innerWidth - 150) / 2}px`;
+            resetHeart.style.top = `${(window.innerHeight - 150) / 2}px`;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Heart {
+            constructor(x, y) {
+                this.x = Math.max(0, Math.min(x, window.innerWidth - 80));
+                this.y = Math.max(0, Math.min(y, window.innerHeight - 80));
+                this.speedX = (Math.random() - 0.5) * 3;
+                this.speedY = (Math.random() - 0.5) * 3;
+                this.opacity = 1;
+                this.popping = false;
+
+                this.element = document.createElement('div');
+                this.element.className = 'heart';
+                this.element.style.left = `${this.x}px`;
+                this.element.style.top = `${this.y}px`;
+                this.element.innerHTML = '♥';
+                document.body.appendChild(this.element);
+
+                this.element.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (!this.popping) {
+                        this.pop();
+                    }
+                });
+            }
+
+            pop() {
+                this.popping = true;
+                this.element.classList.add('popping');
+                playPopSound();
+                
+                setTimeout(() => {
+                    this.element.remove();
+                }, 800);
+            }
+
+            update() {
+                if (!this.popping) {
+                    let newX = this.x + this.speedX;
+                    let newY = this.y + this.speedY;
+
+                    if (newX <= 0) {
+                        newX = 0;
+                        this.speedX = Math.abs(this.speedX) * 0.8;
+                    } else if (newX >= window.innerWidth - 80) {
+                        newX = window.innerWidth - 80;
+                        this.speedX = -Math.abs(this.speedX) * 0.8;
+                    }
+
+                    if (newY <= 0) {
+                        newY = 0;
+                        this.speedY = Math.abs(this.speedY) * 0.8;
+                    } else if (newY >= window.innerHeight - 80) {
+                        newY = window.innerHeight - 80;
+                        this.speedY = -Math.abs(this.speedY) * 0.8;
+                    }
+
+                    this.x = newX;
+                    this.y = newY;
+
+                    this.element.style.left = `${this.x}px`;
+                    this.element.style.top = `${this.y}px`;
+                }
+            }
+        }
+
+        let hearts = [];
+        const initialHeartCount = 10;
+        let totalHeartsCreated = initialHeartCount;
+
+        function spawnHeart() {
+            const x = Math.random() * (window.innerWidth - 80);
+            const y = Math.random() * (window.innerHeight - 80);
+            const newHeart = new Heart(x, y);
+            hearts.push(newHeart);
+            totalHeartsCreated++;
+        }
+
+        function initializeHearts() {
+            hearts.forEach(heart => heart.element.remove()); // Remove existing hearts
+            hearts = [];
+            totalHeartsCreated = initialHeartCount;
+            for (let i = 0; i < initialHeartCount; i++) {
+                spawnHeart();
+            }
+        }
+
+        // Reset game when big heart is tapped
+        resetHeart.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            initializeHearts();
+        });
+
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            initializeHearts();
+        });
+
+        let lastSpawnTime = Date.now();
+        const spawnInterval = 2000;
+
+        function gameLoop() {
+            hearts = hearts.filter(heart => !heart.popping || heart.opacity > 0);
+            hearts.forEach(heart => heart.update());
+
+            const currentTime = Date.now();
+            if (currentTime - lastSpawnTime >= spawnInterval && hearts.length < 15) {
+                spawnHeart();
+                lastSpawnTime = currentTime;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+
+        document.addEventListener('touchstart', (e) => {
+            if (e.target === canvas) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Register the service worker for PWA offline functionality
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log('Service Worker Registered'))
+                .catch((error) => console.log('Registration failed:', error));
+        }
+    </script>
+</body>
+</html>
