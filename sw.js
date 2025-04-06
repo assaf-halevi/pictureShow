@@ -3,7 +3,7 @@ self.addEventListener('install', (event) => {
         caches.open('heart-popper-v1').then((cache) => {
             return cache.addAll([
                 'index.html',
-                'icon-192.png',
+                'icon.png',
                 'icon-512.png'
             ]);
         })
