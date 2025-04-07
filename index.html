@@ -104,19 +104,18 @@
                 this.opacity = 1;
                 this.popping = false;
                 
-                // Speed parameters for properly controlled acceleration
-                this.minSpeed = 0.003; // Very slow start speed
-                this.maxSpeed = 0.12;  // Fast end speed
+                // Movement parameters
+                this.minSpeed = 0.003 + (Math.random() * 0.004); // Very slow starting speed
+                this.maxSpeed = 0.05 + (Math.random() * 0.05);   // Moderate max speed
                 
-                // Delay movement based on index for scattered effect
-                this.moveDelay = 0;
-                this.targetX = null;
-                this.targetY = null;
+                // Unique offset for scattering effect
+                this.offsetX = (Math.random() - 0.5) * 80;
+                this.offsetY = (Math.random() - 0.5) * 80;
                 
-                // Add unique character to each heart
-                this.oscillationSpeed = Math.random() * 0.02 + 0.01;
-                this.oscillationOffset = Math.random() * Math.PI * 2;
-                
+                // Unique angle for orbit-like movements
+                this.orbitAngle = Math.random() * Math.PI * 2;
+                this.orbitSpeed = 0.05 + (Math.random() * 0.05);
+
                 this.element = document.createElement('div');
                 this.element.className = 'heart';
                 this.element.style.left = `${this.x}px`;
@@ -140,123 +139,88 @@
                     this.element.remove();
                 }, 800);
             }
-            
-            // Calculate distance between two points
-            distanceTo(x1, y1, x2, y2) {
-                return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-            }
-            
-            update(touchX, touchY, allHearts) {
-                if (this.popping) return;
-                
-                // Store new target when finger position changes significantly
-                if (touchX !== null && touchY !== null) {
-                    if (this.targetX === null || this.targetY === null ||
-                        this.distanceTo(this.targetX, this.targetY, touchX, touchY) > 50) {
+
+            update(targetX, targetY) {
+                if (!this.popping) {
+                    if (targetX !== null && targetY !== null) {
+                        // Calculate distance to finger
+                        const dx = targetX - this.x;
+                        const dy = targetY - this.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
                         
-                        // Set movement delay based on heart's position in array
-                        // This creates a cascading effect where hearts start moving one after another
-                        this.moveDelay = this.index * 50; // 50ms delay per heart
+                        // Calculate speed - slower at start, faster as getting closer
+                        let speedFactor;
                         
-                        // Store the target
-                        this.targetX = touchX;
-                        this.targetY = touchY;
-                    }
-                } else {
-                    // Reset target when finger is lifted
-                    this.targetX = null;
-                    this.targetY = null;
-                    this.moveDelay = 0;
-                }
-                
-                if (this.moveDelay > 0) {
-                    // Reduce delay timer
-                    this.moveDelay -= 16; // Assuming ~60fps (16ms per frame)
-                    // Add slight drift while waiting
-                    this.x += (Math.random() - 0.5) * 0.5;
-                    this.y += (Math.random() - 0.5) * 0.5;
-                } 
-                else if (this.targetX !== null && this.targetY !== null) {
-                    // Movement with proper acceleration toward finger
-                    const dx = this.targetX - this.x;
-                    const dy = this.targetY - this.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    // Calculate speed factor - true acceleration pattern
-                    // Starts very slow and increases as heart gets closer
-                    let speed;
-                    if (distance < 20) {
-                        // Maximum speed when very close
-                        speed = this.maxSpeed;
-                    } else {
-                        // Speed increases as distance decreases
-                        // Slow at beginning (far away), faster as getting closer
-                        const ratio = Math.min(1.0, 400 / distance);
-                        speed = this.minSpeed + (this.maxSpeed - this.minSpeed) * Math.pow(ratio, 2);
-                    }
-                    
-                    // Apply movement with calculated speed
-                    this.x += dx * speed;
-                    this.y += dy * speed;
-                    
-                    // Add slight oscillation for more interesting movement
-                    const time = Date.now() / 1000;
-                    this.x += Math.sin(time * this.oscillationSpeed + this.oscillationOffset) * 0.5;
-                    this.y += Math.cos(time * this.oscillationSpeed + this.oscillationOffset) * 0.5;
-                    
-                    // Avoid clumping by keeping distance from other hearts
-                    for (const otherHeart of allHearts) {
-                        if (otherHeart !== this) {
-                            const separationDx = this.x - otherHeart.x;
-                            const separationDy = this.y - otherHeart.y;
-                            const separationDist = Math.sqrt(separationDx * separationDx + separationDy * separationDy);
+                        if (distance > 300) {
+                            // Far away - very slow movement
+                            speedFactor = this.minSpeed;
+                        } else {
+                            // Accelerate as we get closer, using an inverse square relationship
+                            const distanceRatio = 1 - (distance / 300);
+                            speedFactor = this.minSpeed + ((this.maxSpeed - this.minSpeed) * distanceRatio * distanceRatio);
+                        }
+                        
+                        // Calculate target position with offset for scattering
+                        let actualTargetX = targetX;
+                        let actualTargetY = targetY;
+                        
+                        if (distance < 120) {
+                            // When close, add orbital/scattering behavior
+                            // Update orbit angle
+                            this.orbitAngle += this.orbitSpeed;
                             
-                            if (separationDist < 50) { // Minimum distance between hearts
-                                const repulsionFactor = 0.02;
-                                const repulsion = (50 - separationDist) * repulsionFactor;
-                                
-                                // Add repulsion vector
-                                if (separationDist > 0) { // Avoid division by zero
-                                    this.x += (separationDx / separationDist) * repulsion;
-                                    this.y += (separationDy / separationDist) * repulsion;
-                                }
-                            }
+                            // Calculate orbit radius based on distance
+                            const orbitRadius = Math.max(40, distance * 0.5);
+                            
+                            // Add orbit offset to target position
+                            actualTargetX += Math.cos(this.orbitAngle) * orbitRadius + this.offsetX;
+                            actualTargetY += Math.sin(this.orbitAngle) * orbitRadius + this.offsetY;
+                        } else {
+                            // Add slight offset for distant hearts to prevent perfect convergence
+                            actualTargetX += this.offsetX * 0.5;
+                            actualTargetY += this.offsetY * 0.5;
+                        }
+                        
+                        // Apply movement
+                        const actualDx = actualTargetX - this.x;
+                        const actualDy = actualTargetY - this.y;
+                        
+                        this.x += actualDx * speedFactor;
+                        this.y += actualDy * speedFactor;
+                    } else {
+                        // When not being dragged, hearts gradually return to their original positions
+                        const dx = this.originalX - this.x;
+                        const dy = this.originalY - this.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // Return speed varies based on distance from original position
+                        const returnSpeedFactor = 0.01 + (0.03 * (distance / 400));
+                        
+                        // Slowly return to original position
+                        this.x += dx * returnSpeedFactor;
+                        this.y += dy * returnSpeedFactor;
+                        
+                        // Add a bit of random movement
+                        this.x += (Math.random() - 0.5) * 1;
+                        this.y += (Math.random() - 0.5) * 1;
+                        
+                        // Keep within bounds
+                        if (this.x <= 0) {
+                            this.x = 0;
+                        } else if (this.x >= window.innerWidth - 80) {
+                            this.x = window.innerWidth - 80;
+                        }
+
+                        if (this.y <= 0) {
+                            this.y = 0;
+                        } else if (this.y >= window.innerHeight - 80) {
+                            this.y = window.innerHeight - 80;
                         }
                     }
-                } else {
-                    // When not being dragged, hearts gradually return to their original positions
-                    const dx = this.originalX - this.x;
-                    const dy = this.originalY - this.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    // Return speed based on distance
-                    const returnSpeedFactor = 0.01 + (0.03 * (distance / 300));
-                    
-                    // Slowly return to original position
-                    this.x += dx * returnSpeedFactor;
-                    this.y += dy * returnSpeedFactor;
-                    
-                    // Add slight random movement
-                    this.x += (Math.random() - 0.5) * 0.8;
-                    this.y += (Math.random() - 0.5) * 0.8;
-                }
-                
-                // Keep within bounds
-                if (this.x <= 0) {
-                    this.x = 0;
-                } else if (this.x >= window.innerWidth - 80) {
-                    this.x = window.innerWidth - 80;
-                }
 
-                if (this.y <= 0) {
-                    this.y = 0;
-                } else if (this.y >= window.innerHeight - 80) {
-                    this.y = window.innerHeight - 80;
+                    this.element.style.left = `${this.x}px`;
+                    this.element.style.top = `${this.y}px`;
                 }
-                
-                // Update position
-                this.element.style.left = `${this.x}px`;
-                this.element.style.top = `${this.y}px`;
             }
         }
 
@@ -265,8 +229,6 @@
         let totalHeartsCreated = initialHeartCount;
         let touchX = null;
         let touchY = null;
-        let lastTouchX = null;
-        let lastTouchY = null;
 
         function spawnHeart(x, y, index) {
             // Spawn hearts in random positions across the screen
@@ -306,30 +268,9 @@
 
         function gameLoop() {
             hearts = hearts.filter(heart => !heart.popping || heart.opacity > 0);
-            
-            // Determine if touch position has significantly changed
-            let touchMoved = false;
-            if (touchX !== null && lastTouchX !== null) {
-                const touchDist = Math.sqrt(Math.pow(touchX - lastTouchX, 2) + Math.pow(touchY - lastTouchY, 2));
-                touchMoved = touchDist > 20;
-            }
-            
-            // If touch position changed significantly, shuffle indexes to create varied movement timing
-            if (touchMoved) {
-                // Randomly shuffle heart indexes to vary which hearts move first
-                const shuffledOrder = [...hearts.keys()].sort(() => Math.random() - 0.5);
-                shuffledOrder.forEach((newIndex, i) => {
-                    hearts[i].index = newIndex;
-                });
-            }
-            
-            // Update last touch position
-            lastTouchX = touchX;
-            lastTouchY = touchY;
-            
-            // Update all hearts
-            hearts.forEach((heart) => {
-                heart.update(touchX, touchY, hearts);
+            hearts.forEach((heart, index) => {
+                heart.index = index;
+                heart.update(touchX, touchY);
             });
 
             const currentTime = Date.now();
