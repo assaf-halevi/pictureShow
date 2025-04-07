@@ -2,7 +2,7 @@
     "name": "Heart Popper Game",
     "short_name": "HeartPop",
     "start_url": "index.html",
-
+    "display": "fullscreen",
     "background_color": "#f0f0f0",
     "theme_color": "#ff69b4",
     "icons": [
