@@ -33,20 +33,12 @@
             line-height: 80px;
             color: #ff69b4;
             text-align: center;
-            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55), opacity 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55), color 0.8s ease-in-out;
             touch-action: none;
             filter: drop-shadow(0 0 8px rgba(255, 105, 180, 0.7));
             user-select: none;
-            /* Added black outline to make hearts stand out */
-            text-shadow: 
-                -1px -1px 0 #000,
-                1px -1px 0 #000,
-                -1px 1px 0 #000,
-                1px 1px 0 #000,
-                0 -2px 0 #000,
-                0 2px 0 #000,
-                -2px 0 0 #000,
-                2px 0 0 #000;
+            opacity: 0; /* Start with opacity 0 for fade-in effect */
+            transition: color 1s ease, opacity 1s ease; /* Transition for color and opacity */
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; /* Black outline */
         }
 
         .popping {
@@ -54,13 +46,13 @@
             opacity: 0;
             filter: drop-shadow(0 0 20px rgba(255, 105, 180, 1));
             color: #ffb6c1;
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55), opacity 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
         }
-
+        
         .fading {
-            transform: scale(1.5) rotate(360deg);
-            opacity: 0;
             color: white !important;
-            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.9));
+            opacity: 0;
+            transition: color 1.5s ease, opacity 1.5s ease;
         }
 
         #resetHeart {
@@ -74,16 +66,7 @@
             filter: drop-shadow(0 0 12px rgba(255, 20, 147, 0.8));
             cursor: pointer;
             z-index: 10;
-            /* Added black outline to make the reset heart stand out */
-            text-shadow: 
-                -2px -2px 0 #000,
-                2px -2px 0 #000,
-                -2px 2px 0 #000,
-                2px 2px 0 #000,
-                0 -3px 0 #000,
-                0 3px 0 #000,
-                -3px 0 0 #000,
-                3px 0 0 #000;
+            text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000; /* Black outline */
         }
     </style>
 </head>
@@ -106,23 +89,10 @@
             oscillator.stop(audioCtx.currentTime + 0.2);
         }
 
-        function playResetSound() {
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
-            oscillator.frequency.exponentialRampToValueAtTime(700, audioCtx.currentTime + 0.3);
-            gainNode.gain.setValueAtTime(0.6, audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + 0.3);
-        }
-
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const resetHeart = document.getElementById('resetHeart');
+        let resetting = false;
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -142,13 +112,13 @@
                 this.index = index;
                 this.speedX = (Math.random() - 0.5) * 3;
                 this.speedY = (Math.random() - 0.5) * 3;
-                this.opacity = 1;
+                this.opacity = 0; // Start with opacity 0 for fade-in effect
                 this.popping = false;
                 this.fading = false;
                 
-                // Significantly faster movement parameters
-                this.minSpeed = 0.2 + (Math.random() * 0.1);   // Even faster starting speed
-                this.maxSpeed = 0.4 + (Math.random() * 0.15);  // Even faster max speed
+                // Even faster movement parameters
+                this.minSpeed = 0.08 + (Math.random() * 0.07); // Much faster starting speed
+                this.maxSpeed = 0.25 + (Math.random() * 0.15);  // Even faster max speed
                 
                 // Unique offset for scattering effect
                 this.offsetX = (Math.random() - 0.5) * 60;
@@ -156,7 +126,7 @@
                 
                 // Unique angle for orbit-like movements
                 this.orbitAngle = Math.random() * Math.PI * 2;
-                this.orbitSpeed = 0.1 + (Math.random() * 0.1); // Even faster orbit speed
+                this.orbitSpeed = 0.1 + (Math.random() * 0.1); // Faster orbit speed
 
                 this.element = document.createElement('div');
                 this.element.className = 'heart';
@@ -164,6 +134,11 @@
                 this.element.style.top = `${this.y}px`;
                 this.element.innerHTML = '♥';
                 document.body.appendChild(this.element);
+
+                // Fade in effect
+                setTimeout(() => {
+                    this.element.style.opacity = '1';
+                }, 50 + index * 50); // Stagger the fade-in
 
                 this.element.addEventListener('touchstart', (e) => {
                     e.preventDefault();
@@ -182,12 +157,10 @@
                 }, 800);
             }
 
-            fadeToWhite() {
+            fadeOut() {
                 this.fading = true;
                 this.element.classList.add('fading');
-                setTimeout(() => {
-                    this.element.remove();
-                }, 800);
+                // Don't remove the element - it will be invisible but still there
             }
 
             update(targetX, targetY) {
@@ -198,21 +171,21 @@
                         const dy = targetY - this.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
                         
-                        // Calculate speed - dramatically faster at all distances
+                        // Calculate speed - much faster at all distances
                         let speedFactor;
                         
-                        // Modified distance-based speed calculation for much faster response
-                        if (distance > 150) {
-                            // Far away - moderate to fast movement
-                            speedFactor = this.minSpeed * 2.5;
+                        // Modified distance-based speed calculation for even faster response
+                        if (distance > 150) { // Reduced threshold for faster response
+                            // Far away - faster movement
+                            speedFactor = this.minSpeed * 2;
                         } else {
                             // Much faster acceleration as we get closer
                             const distanceRatio = 1 - (distance / 150);
-                            speedFactor = this.minSpeed * 2.5 + ((this.maxSpeed - this.minSpeed) * distanceRatio * 2);
+                            speedFactor = this.minSpeed + ((this.maxSpeed - this.minSpeed) * distanceRatio);
                             
                             // Additional speed boost for hearts that are very close
                             if (distance < 80) {
-                                speedFactor *= 2;
+                                speedFactor *= 2; // Bigger boost than before
                             }
                         }
                         
@@ -226,13 +199,13 @@
                             this.orbitAngle += this.orbitSpeed;
                             
                             // Calculate orbit radius based on distance - smaller radius
-                            const orbitRadius = Math.max(25, distance * 0.3);
+                            const orbitRadius = Math.max(25, distance * 0.35);
                             
                             // Add orbit offset to target position
                             actualTargetX += Math.cos(this.orbitAngle) * orbitRadius + this.offsetX * 0.5;
                             actualTargetY += Math.sin(this.orbitAngle) * orbitRadius + this.offsetY * 0.5;
                         } else {
-                            // Minimal offset for distant hearts to ensure direct path to finger
+                            // Add slight offset for distant hearts to prevent perfect convergence
                             actualTargetX += this.offsetX * 0.2;
                             actualTargetY += this.offsetY * 0.2;
                         }
@@ -278,11 +251,10 @@
         }
 
         let hearts = [];
-        const initialHeartCount = 15;
+        const initialHeartCount = 15; // Increased number of hearts for better effect
         let totalHeartsCreated = initialHeartCount;
         let touchX = null;
         let touchY = null;
-        let gameInitializing = false;
 
         function spawnHeart(x, y, index) {
             // Spawn hearts in random positions across the screen
@@ -293,30 +265,17 @@
             totalHeartsCreated++;
         }
 
-        function fadeOutAllHearts() {
-            hearts.forEach(heart => {
-                if (!heart.popping && !heart.fading) {
-                    heart.fadeToWhite();
-                }
-            });
-        }
-
         function initializeHearts() {
-            if (gameInitializing) return;
+            if (resetting) return;
             
-            gameInitializing = true;
-            playResetSound();
+            resetting = true;
             
             // First fade out all existing hearts
-            fadeOutAllHearts();
+            hearts.forEach(heart => heart.fadeOut());
             
-            // Then wait for the fade animation to complete before creating new ones
+            // Wait for fade out animation to complete
             setTimeout(() => {
-                hearts.forEach(heart => {
-                    if (heart.element.parentNode) {
-                        heart.element.remove();
-                    }
-                });
+                hearts.forEach(heart => heart.element.remove());
                 hearts = [];
                 totalHeartsCreated = initialHeartCount;
                 
@@ -327,8 +286,8 @@
                     spawnHeart(x, y, i);
                 }
                 
-                gameInitializing = false;
-            }, 850);
+                resetting = false;
+            }, 1500); // Wait for fade out animation to complete
         }
 
         resetHeart.addEventListener('touchstart', (e) => {
@@ -346,14 +305,15 @@
         const spawnInterval = 3000; // Longer interval between spawns
 
         function gameLoop() {
-            hearts = hearts.filter(heart => (!heart.popping && !heart.fading) || heart.opacity > 0);
+            // Only filter out popped hearts, keep fading hearts
+            hearts = hearts.filter(heart => !heart.popping || heart.opacity > 0);
             hearts.forEach((heart, index) => {
                 heart.index = index;
                 heart.update(touchX, touchY);
             });
 
             const currentTime = Date.now();
-            if (currentTime - lastSpawnTime >= spawnInterval && hearts.length < 20 && touchX === null && !gameInitializing) {
+            if (currentTime - lastSpawnTime >= spawnInterval && hearts.length < 20 && touchX === null && !resetting) {
                 spawnHeart(window.innerWidth / 2, window.innerHeight / 2, hearts.length);
                 lastSpawnTime = currentTime;
             }
@@ -365,7 +325,7 @@
 
         // Touch controls for interacting with hearts
         document.addEventListener('touchstart', (e) => {
-            if (e.target === canvas || e.target.className === 'heart') {
+            if (e.target === canvas || e.target.className.includes('heart')) {
                 e.preventDefault();
                 const touch = e.touches[0];
                 touchX = touch.clientX - 40; // Adjust for heart center
