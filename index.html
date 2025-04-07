@@ -37,7 +37,7 @@
             filter: drop-shadow(0 0 8px rgba(255, 105, 180, 0.7));
             user-select: none;
             opacity: 0; /* Start with opacity 0 for fade-in effect */
-            transition: color 1s ease, opacity 1s ease, text-shadow 1s ease; /* Added text-shadow to transition */
+            transition: color 1s ease, opacity 1s ease, text-shadow 1s ease, filter 1s ease; /* Added filter to transition */
             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; /* Black outline */
         }
 
@@ -52,8 +52,9 @@
         .fading {
             color: white !important;
             opacity: 0;
+            filter: drop-shadow(0 0 0px rgba(255, 105, 180, 0)) !important; /* Fade out the glow too */
             text-shadow: -1px -1px 0 rgba(0,0,0,0), 1px -1px 0 rgba(0,0,0,0), -1px 1px 0 rgba(0,0,0,0), 1px 1px 0 rgba(0,0,0,0) !important; /* Fade out the outline too */
-            transition: color 1.5s ease, opacity 1.5s ease, text-shadow 1.5s ease;
+            transition: color 1.5s ease, opacity 1.5s ease, text-shadow 1.5s ease, filter 1.5s ease;
         }
 
         #resetHeart {
@@ -77,6 +78,7 @@
 
     <script>
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
         function playPopSound() {
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
@@ -89,11 +91,69 @@
             oscillator.start();
             oscillator.stop(audioCtx.currentTime + 0.2);
         }
+        
+        function playFartSound() {
+            // Create oscillator for the base sound
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            // Create filter for the fart effect
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 400;
+            filter.Q.value = 10;
+            
+            // Connect the nodes
+            oscillator.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            // Hideous fart characteristics
+            oscillator.type = 'sawtooth';
+            
+            // Random starting frequency between 100-200Hz
+            const startFreq = 100 + Math.random() * 100;
+            oscillator.frequency.setValueAtTime(startFreq, audioCtx.currentTime);
+            
+            // Downward frequency slide
+            oscillator.frequency.exponentialRampToValueAtTime(
+                startFreq * 0.5, 
+                audioCtx.currentTime + 0.3 + Math.random() * 0.3
+            );
+            
+            // Volume envelope
+            gainNode.gain.setValueAtTime(0.01, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.6, audioCtx.currentTime + 0.05);
+            
+            // Random volume fluctuations for the wet sound
+            for (let i = 0; i < 5; i++) {
+                const time = audioCtx.currentTime + 0.1 + (i * 0.07) + (Math.random() * 0.03);
+                gainNode.gain.setValueAtTime(0.1 + Math.random() * 0.5, time);
+            }
+            
+            // Final fade out
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+            
+            // Filter modulation for the sputtering effect
+            filter.frequency.setValueAtTime(400, audioCtx.currentTime);
+            for (let i = 0; i < 6; i++) {
+                const time = audioCtx.currentTime + (i * 0.1) + (Math.random() * 0.05);
+                filter.frequency.exponentialRampToValueAtTime(
+                    200 + Math.random() * 700, 
+                    time
+                );
+            }
+            
+            // Play the sound
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 1.0);
+        }
 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const resetHeart = document.getElementById('resetHeart');
         let resetting = false;
+        let isDragging = false; // Track if finger is dragging
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -170,7 +230,8 @@
 
             update(targetX, targetY) {
                 if (!this.popping && !this.fading) {
-                    if (targetX !== null && targetY !== null) {
+                    if (targetX !== null && targetY !== null && isDragging) {
+                        // Only follow the finger if we're dragging, not just touching
                         // Calculate distance to finger
                         const dx = targetX - this.x;
                         const dy = targetY - this.y;
@@ -285,6 +346,9 @@
             
             resetting = true;
             
+            // Play fart sound when resetting hearts
+            playFartSound();
+            
             // First fade out all existing hearts
             hearts.forEach(heart => heart.fadeOut());
             
@@ -345,6 +409,7 @@
                 const touch = e.touches[0];
                 touchX = touch.clientX - 40; // Adjust for heart center
                 touchY = touch.clientY - 40;
+                isDragging = false; // Start with not dragging
             }
         }, { passive: false });
 
@@ -353,12 +418,14 @@
             const touch = e.touches[0];
             touchX = touch.clientX - 40;
             touchY = touch.clientY - 40;
+            isDragging = true; // Now we are dragging
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
             e.preventDefault();
             touchX = null;
             touchY = null;
+            isDragging = false; // Reset dragging state
         }, { passive: false });
 
         if ('serviceWorker' in navigator) {
