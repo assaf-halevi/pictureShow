@@ -96,11 +96,14 @@
             constructor(x, y, index) {
                 this.x = x;
                 this.y = y;
+                this.originalX = x; // Store original position
+                this.originalY = y;
                 this.index = index;
                 this.speedX = (Math.random() - 0.5) * 3;
                 this.speedY = (Math.random() - 0.5) * 3;
                 this.opacity = 1;
                 this.popping = false;
+                this.followSpeed = 0.05 + (Math.random() * 0.1); // Random follow speed for each heart
 
                 this.element = document.createElement('div');
                 this.element.className = 'heart';
@@ -129,40 +132,38 @@
             update(targetX, targetY) {
                 if (!this.popping) {
                     if (targetX !== null && targetY !== null) {
-                        // Directly follow finger - calculate position based on index to spread hearts out
-                        const spreadFactor = 40; // Distance between hearts
-                        const rowSize = 4; // Hearts per row
+                        // Gradually move towards finger position - each heart follows independently
+                        const dx = targetX - this.x;
+                        const dy = targetY - this.y;
                         
-                        // Calculate row and column based on index
-                        const row = Math.floor(this.index / rowSize);
-                        const col = this.index % rowSize;
-                        
-                        // Offset from touch point
-                        this.x = targetX - spreadFactor + (col * spreadFactor);
-                        this.y = targetY - spreadFactor + (row * spreadFactor);
+                        // Move each heart at its own speed towards the finger
+                        this.x += dx * this.followSpeed;
+                        this.y += dy * this.followSpeed;
                     } else {
-                        // Default movement when not dragging
-                        let newX = this.x + this.speedX;
-                        let newY = this.y + this.speedY;
-
-                        if (newX <= 0) {
-                            newX = 0;
-                            this.speedX = Math.abs(this.speedX) * 0.8;
-                        } else if (newX >= window.innerWidth - 80) {
-                            newX = window.innerWidth - 80;
-                            this.speedX = -Math.abs(this.speedX) * 0.8;
+                        // When not being dragged, hearts gradually return to their original positions
+                        const dx = this.originalX - this.x;
+                        const dy = this.originalY - this.y;
+                        
+                        // Slowly return to original position
+                        this.x += dx * 0.02;
+                        this.y += dy * 0.02;
+                        
+                        // Add a bit of random movement
+                        this.x += (Math.random() - 0.5) * 1;
+                        this.y += (Math.random() - 0.5) * 1;
+                        
+                        // Keep within bounds
+                        if (this.x <= 0) {
+                            this.x = 0;
+                        } else if (this.x >= window.innerWidth - 80) {
+                            this.x = window.innerWidth - 80;
                         }
 
-                        if (newY <= 0) {
-                            newY = 0;
-                            this.speedY = Math.abs(this.speedY) * 0.8;
-                        } else if (newY >= window.innerHeight - 80) {
-                            newY = window.innerHeight - 80;
-                            this.speedY = -Math.abs(this.speedY) * 0.8;
+                        if (this.y <= 0) {
+                            this.y = 0;
+                        } else if (this.y >= window.innerHeight - 80) {
+                            this.y = window.innerHeight - 80;
                         }
-
-                        this.x = newX;
-                        this.y = newY;
                     }
 
                     this.element.style.left = `${this.x}px`;
@@ -172,13 +173,16 @@
         }
 
         let hearts = [];
-        const initialHeartCount = 10;
+        const initialHeartCount = 15; // Increased number of hearts for better effect
         let totalHeartsCreated = initialHeartCount;
         let touchX = null;
         let touchY = null;
 
         function spawnHeart(x, y, index) {
-            const newHeart = new Heart(x, y, index);
+            // Spawn hearts in random positions across the screen
+            const randomX = Math.random() * (window.innerWidth - 100) + 50;
+            const randomY = Math.random() * (window.innerHeight - 100) + 50;
+            const newHeart = new Heart(randomX, randomY, index);
             hearts.push(newHeart);
             totalHeartsCreated++;
         }
@@ -187,10 +191,12 @@
             hearts.forEach(heart => heart.element.remove());
             hearts = [];
             totalHeartsCreated = initialHeartCount;
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
+            
+            // Distribute hearts across the screen rather than at center
             for (let i = 0; i < initialHeartCount; i++) {
-                spawnHeart(centerX, centerY, i);
+                const x = Math.random() * (window.innerWidth - 100) + 50;
+                const y = Math.random() * (window.innerHeight - 100) + 50;
+                spawnHeart(x, y, i);
             }
         }
 
@@ -206,18 +212,17 @@
         });
 
         let lastSpawnTime = Date.now();
-        const spawnInterval = 2000;
+        const spawnInterval = 3000; // Longer interval between spawns
 
         function gameLoop() {
             hearts = hearts.filter(heart => !heart.popping || heart.opacity > 0);
             hearts.forEach((heart, index) => {
-                // Update index to maintain proper formation when following finger
                 heart.index = index;
                 heart.update(touchX, touchY);
             });
 
             const currentTime = Date.now();
-            if (currentTime - lastSpawnTime >= spawnInterval && hearts.length < 15 && touchX === null) {
+            if (currentTime - lastSpawnTime >= spawnInterval && hearts.length < 20 && touchX === null) {
                 spawnHeart(window.innerWidth / 2, window.innerHeight / 2, hearts.length);
                 lastSpawnTime = currentTime;
             }
@@ -227,7 +232,7 @@
 
         gameLoop();
 
-        // Touch controls for dragging hearts
+        // Touch controls for interacting with hearts
         document.addEventListener('touchstart', (e) => {
             if (e.target === canvas || e.target.className === 'heart') {
                 e.preventDefault();
