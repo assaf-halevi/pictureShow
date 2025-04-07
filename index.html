@@ -37,7 +37,7 @@
             filter: drop-shadow(0 0 8px rgba(255, 105, 180, 0.7));
             user-select: none;
             opacity: 0; /* Start with opacity 0 for fade-in effect */
-            transition: color 1s ease, opacity 1s ease; /* Transition for color and opacity */
+            transition: color 1s ease, opacity 1s ease, text-shadow 1s ease; /* Added text-shadow to transition */
             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; /* Black outline */
         }
 
@@ -52,7 +52,8 @@
         .fading {
             color: white !important;
             opacity: 0;
-            transition: color 1.5s ease, opacity 1.5s ease;
+            text-shadow: -1px -1px 0 rgba(0,0,0,0), 1px -1px 0 rgba(0,0,0,0), -1px 1px 0 rgba(0,0,0,0), 1px 1px 0 rgba(0,0,0,0) !important; /* Fade out the outline too */
+            transition: color 1.5s ease, opacity 1.5s ease, text-shadow 1.5s ease;
         }
 
         #resetHeart {
@@ -117,12 +118,16 @@
                 this.fading = false;
                 
                 // Even faster movement parameters
-                this.minSpeed = 0.08 + (Math.random() * 0.07); // Much faster starting speed
-                this.maxSpeed = 0.25 + (Math.random() * 0.15);  // Even faster max speed
+                this.minSpeed = 0.08 + (Math.random() * 0.07); // Fast starting speed
+                this.maxSpeed = 0.25 + (Math.random() * 0.15);  // Fast max speed
                 
-                // Unique offset for scattering effect
-                this.offsetX = (Math.random() - 0.5) * 60;
-                this.offsetY = (Math.random() - 0.5) * 60;
+                // Much larger offsets for better scattering
+                this.offsetX = (Math.random() - 0.5) * 200;
+                this.offsetY = (Math.random() - 0.5) * 200;
+                
+                // Unique personality for each heart
+                this.scatterFactor = 0.6 + (Math.random() * 0.8); // How much this heart likes to scatter
+                this.attractionFactor = 0.6 + (Math.random() * 0.8); // How attracted this heart is to the finger
                 
                 // Unique angle for orbit-like movements
                 this.orbitAngle = Math.random() * Math.PI * 2;
@@ -174,43 +179,53 @@
                         // Calculate speed - much faster at all distances
                         let speedFactor;
                         
-                        // Modified distance-based speed calculation for even faster response
-                        if (distance > 150) { // Reduced threshold for faster response
-                            // Far away - faster movement
-                            speedFactor = this.minSpeed * 2;
-                        } else {
-                            // Much faster acceleration as we get closer
-                            const distanceRatio = 1 - (distance / 150);
-                            speedFactor = this.minSpeed + ((this.maxSpeed - this.minSpeed) * distanceRatio);
+                        // Modified distance-based speed calculation for scatter effect
+                        if (distance > 250) { // Far away
+                            // Far away - moderate speed with high scatter
+                            speedFactor = this.minSpeed * this.attractionFactor;
+                        } else if (distance > 80) { // Medium distance - high scatter zone
+                            // Medium distance - faster but with significant scatter
+                            const distanceRatio = (distance - 80) / 170; // 0 at 80px, 1 at 250px
                             
-                            // Additional speed boost for hearts that are very close
-                            if (distance < 80) {
-                                speedFactor *= 2; // Bigger boost than before
-                            }
+                            // More scatter when further away, more direct movement when closer
+                            speedFactor = this.minSpeed + ((this.maxSpeed - this.minSpeed) * (1 - distanceRatio)) * this.attractionFactor;
+                        } else {
+                            // Very close - fastest speed with little scatter (blob-like behavior)
+                            speedFactor = this.maxSpeed * 1.5 * this.attractionFactor;
                         }
                         
-                        // Calculate target position with offset for scattering
+                        // Calculate target position with highly varied scatter based on distance
                         let actualTargetX = targetX;
                         let actualTargetY = targetY;
                         
-                        if (distance < 80) { // Even tighter orbits
-                            // When close, add orbital/scattering behavior
-                            // Update orbit angle
+                        if (distance < 80) { // Very close - tight orbit (blob)
+                            // Tight orbit when close
                             this.orbitAngle += this.orbitSpeed;
+                            const orbitRadius = Math.max(20, distance * 0.3);
                             
-                            // Calculate orbit radius based on distance - smaller radius
-                            const orbitRadius = Math.max(25, distance * 0.35);
+                            actualTargetX += Math.cos(this.orbitAngle) * orbitRadius + this.offsetX * 0.1;
+                            actualTargetY += Math.sin(this.orbitAngle) * orbitRadius + this.offsetY * 0.1;
+                        } else if (distance < 250) { // Medium distance - high scatter
+                            // The scatter effect increases as distance increases from 80px to 250px
+                            const scatterRatio = (distance - 80) / 170; // 0 at 80px, 1 at 250px
                             
-                            // Add orbit offset to target position
-                            actualTargetX += Math.cos(this.orbitAngle) * orbitRadius + this.offsetX * 0.5;
-                            actualTargetY += Math.sin(this.orbitAngle) * orbitRadius + this.offsetY * 0.5;
-                        } else {
-                            // Add slight offset for distant hearts to prevent perfect convergence
-                            actualTargetX += this.offsetX * 0.2;
-                            actualTargetY += this.offsetY * 0.2;
+                            // Calculate scatter factor that increases with distance
+                            const dynamicScatterFactor = this.scatterFactor * scatterRatio * 1.5;
+                            
+                            // Apply increasing scatter effect
+                            actualTargetX += this.offsetX * dynamicScatterFactor;
+                            actualTargetY += this.offsetY * dynamicScatterFactor;
+                            
+                            // Add some oscillation for more natural movement
+                            actualTargetX += Math.sin(Date.now() * 0.001 + this.index) * 40 * scatterRatio;
+                            actualTargetY += Math.cos(Date.now() * 0.001 + this.index) * 40 * scatterRatio;
+                        } else { // Far away - moderate scatter
+                            // Less scatter when very far away to ensure they eventually reach the target
+                            actualTargetX += this.offsetX * 0.3 * this.scatterFactor;
+                            actualTargetY += this.offsetY * 0.3 * this.scatterFactor;
                         }
                         
-                        // Apply movement - direct movement for faster response
+                        // Apply movement with varying speed based on distance
                         this.x += (actualTargetX - this.x) * speedFactor;
                         this.y += (actualTargetY - this.y) * speedFactor;
                     } else {
