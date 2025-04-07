@@ -103,7 +103,8 @@
                 this.speedY = (Math.random() - 0.5) * 3;
                 this.opacity = 1;
                 this.popping = false;
-                this.followSpeed = 0.05 + (Math.random() * 0.1); // Random follow speed for each heart
+                this.baseSpeed = 0.01 + (Math.random() * 0.01); // Base speed factor (slower start)
+                this.maxSpeed = 0.2 + (Math.random() * 0.1);    // Maximum speed (faster end)
 
                 this.element = document.createElement('div');
                 this.element.className = 'heart';
@@ -132,21 +133,40 @@
             update(targetX, targetY) {
                 if (!this.popping) {
                     if (targetX !== null && targetY !== null) {
-                        // Gradually move towards finger position - each heart follows independently
+                        // Calculate distance to finger
                         const dx = targetX - this.x;
                         const dy = targetY - this.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
                         
-                        // Move each heart at its own speed towards the finger
-                        this.x += dx * this.followSpeed;
-                        this.y += dy * this.followSpeed;
+                        // Calculate speed based on distance - faster as hearts get closer
+                        // Using an inverse relationship to distance
+                        let speedFactor;
+                        
+                        if (distance < 50) {
+                            // Maximum speed when very close
+                            speedFactor = this.maxSpeed;
+                        } else {
+                            // Gradually increase speed as hearts get closer
+                            // This creates an acceleration effect
+                            const distanceRatio = Math.min(1, 800 / distance);
+                            speedFactor = this.baseSpeed + (this.maxSpeed - this.baseSpeed) * distanceRatio * distanceRatio;
+                        }
+                        
+                        // Apply movement with calculated speed
+                        this.x += dx * speedFactor;
+                        this.y += dy * speedFactor;
                     } else {
                         // When not being dragged, hearts gradually return to their original positions
                         const dx = this.originalX - this.x;
                         const dy = this.originalY - this.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // Return speed also varies based on distance from original position
+                        const returnSpeedFactor = 0.02 + (0.06 * (distance / 400));
                         
                         // Slowly return to original position
-                        this.x += dx * 0.02;
-                        this.y += dy * 0.02;
+                        this.x += dx * returnSpeedFactor;
+                        this.y += dy * returnSpeedFactor;
                         
                         // Add a bit of random movement
                         this.x += (Math.random() - 0.5) * 1;
