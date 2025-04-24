@@ -7,12 +7,12 @@
     "theme_color": "#ff69b4",
     "icons": [
         {
-            "src": "icon.png",
+            "src": "https://assaf-halevi.github.io/starring/icon.png",
             "sizes": "192x192",
             "type": "image/png"
         },
         {
-            "src": "icon-512.png",
+            "src": "https://assaf-halevi.github.io/starring/icon-512.png",
             "sizes": "512x512",
             "type": "image/png"
         }
