@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pixabay Image Search - Single Image Mode</title>
+    <meta name="theme-color" content="#ffffff">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.png">
+    <title>Pixabay Image Search</title>
     <style>
         body {
             margin: 0;
@@ -24,6 +27,7 @@
             left: 0;
             background-color: #fff;
             z-index: 10;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         input[type="text"] {
             width: 100%;
@@ -61,6 +65,12 @@
             cursor: pointer;
             font-size: 18px;
             border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
         }
         #prev-button {
             left: 10px;
@@ -77,6 +87,7 @@
             font-size: 14px;
             margin-top: 10px;
             text-align: center;
+            padding: 0 10px;
         }
         .attribution {
             position: fixed;
@@ -102,9 +113,10 @@
             font-size: 16px;
             color: #333;
             background-color: rgba(255, 255, 255, 0.8);
-            padding: 10px;
+            padding: 10px 20px;
             border-radius: 5px;
             z-index: 20;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
         @media (max-width: 400px) {
             input[type="text"] {
@@ -114,32 +126,88 @@
             .nav-button {
                 padding: 8px;
                 font-size: 16px;
+                width: 36px;
+                height: 36px;
             }
             .attribution {
                 font-size: 10px;
             }
         }
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease-out;
+        }
+        .splash-logo {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 20px;
+        }
+        .splash-text {
+            font-size: 24px;
+            color: #333;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="splash-screen">
+        <img src="icon.png" alt="App Logo" class="splash-logo">
+        <div class="splash-text">Pixabay Image Search</div>
+    </div>
+
     <div class="search-container">
         <input type="text" id="search-input" placeholder="Search for images..." onkeypress="if(event.key === 'Enter') searchImages()">
     </div>
     <div class="image-container">
-        <button id="prev-button" class="nav-button" onclick="prevImage()" disabled><</button>
+        <button id="prev-button" class="nav-button" onclick="prevImage()" disabled>&lt;</button>
         <img id="search-image" src="" alt="Search result">
-        <button id="next-button" class="nav-button" onclick="nextImage()" disabled>></button>
+        <button id="next-button" class="nav-button" onclick="nextImage()" disabled>&gt;</button>
     </div>
     <div id="error-message" class="error-message"></div>
     <div id="attribution" class="attribution"></div>
     <div id="loading">Loading...</div>
 
     <script>
-        // Pixabay API Key - IMPORTANT: Replace with your actual Pixabay API key
-        const PIXABAY_API_KEY = '50099116-cef7445eb1a8b9d87c36ede30';  // Example key - replace with your own
+        // Pixabay API Key
+        const PIXABAY_API_KEY = '50099116-cef7445eb1a8b9d87c36ede30';
         let images = [];
         let currentImageIndex = 0;
         let preloadedImages = {};
+
+        // Remove splash screen after 2 seconds
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const splash = document.getElementById('splash-screen');
+                splash.style.opacity = '0';
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                }, 500);
+            }, 2000);
+        });
+
+        // Register service worker for PWA functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
 
         // Handle image load errors
         function handleImageError() {
@@ -191,13 +259,6 @@
                 errorMessage.textContent = 'Please enter a valid search query (at least 2 characters)';
                 document.getElementById('search-image').src = '';
                 document.getElementById('search-image').alt = 'No query entered';
-                loading.style.display = 'none';
-                return;
-            }
-
-            // Validate API key
-            if (!PIXABAY_API_KEY || PIXABAY_API_KEY === 'your_pixabay_api_key_here') {
-                errorMessage.textContent = 'Please provide a valid Pixabay API key';
                 loading.style.display = 'none';
                 return;
             }
@@ -375,6 +436,27 @@
         
         // Show startup message
         document.getElementById('error-message').textContent = 'Enter a search term and press Enter to begin';
+        
+        // Listen for app going online/offline
+        window.addEventListener('online', () => {
+            document.getElementById('error-message').textContent = 'Connection restored. You can search now.';
+        });
+        
+        window.addEventListener('offline', () => {
+            document.getElementById('error-message').textContent = 'You are offline. Please check your connection.';
+        });
+        
+        // Handle back button for Android
+        document.addEventListener('backbutton', (e) => {
+            e.preventDefault();
+            if (navigator.app) {
+                navigator.app.exitApp();
+            } else if (navigator.device) {
+                navigator.device.exitApp();
+            } else {
+                window.close();
+            }
+        }, false);
     </script>
 </body>
 </html>
