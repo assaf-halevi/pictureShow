@@ -1,59 +1,91 @@
-// Cache name can stay the same unless you want to force a full refresh
-const CACHE_NAME = 'heart-popper-v1';
-
-// Files to pre-cache (for offline support)
-const FILES_TO_CACHE = [
-  'index.html',
-  'icon.png',
-  'icon-512.png'
+// Service Worker for Pixabay Image Search App
+const CACHE_NAME = 'pixabay-image-search-v1';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/icon.png',
+  '/icon-512.png',
+  '/manifest.json'
 ];
 
-// Install event: Cache initial files
-self.addEventListener('install', (event) => {
+// Install event - cache the essential files
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Caching initial files');
-      return cache.addAll(FILES_TO_CACHE);
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('Opened cache');
+        return cache.addAll(urlsToCache);
+      })
+      .catch(err => {
+        console.error('Cache opening failed:', err);
+      })
   );
-  // Activate the new service worker immediately
-  self.skipWaiting();
 });
 
-// Activate event: Optional cleanup of old caches (if you change CACHE_NAME later)
-self.addEventListener('activate', (event) => {
+// Activate event - clean up old caches
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map((name) => {
-          if (name !== CACHE_NAME) {
-            console.log('Deleting old cache:', name);
-            return caches.delete(name);
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
           }
         })
       );
     })
   );
-  // Take control of the page immediately
-  self.clients.claim();
+  return self.clients.claim();
 });
 
-// Fetch event: Network-first strategy
-self.addEventListener('fetch', (event) => {
+// Fetch event - serve from cache if available, otherwise fetch from network
+self.addEventListener('fetch', event => {
+  // Skip Pixabay API requests - we don't want to cache these
+  if (event.request.url.includes('pixabay.com/api')) {
+    return;
+  }
+  
   event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        // Update the cache with the fresh response
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, networkResponse.clone());
-          return networkResponse;
-        });
-      })
-      .catch(() => {
-        // If network fails (e.g., offline), fall back to cache
-        return caches.match(event.request).then((cachedResponse) => {
-          return cachedResponse || new Response('Offline and no cache available', { status: 503 });
-        });
+    caches.match(event.request)
+      .then(response => {
+        // Cache hit - return the response from the cached version
+        if (response) {
+          return response;
+        }
+        
+        // Not in cache - fetch and cache the response
+        return fetch(event.request)
+          .then(response => {
+            // Check if we received a valid response
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            // Clone the response
+            const responseToCache = response.clone();
+
+            caches.open(CACHE_NAME)
+              .then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+
+            return response;
+          })
+          .catch(err => {
+            console.error('Fetch failed:', err);
+            // You might want to return a custom offline page here
+            if (event.request.mode === 'navigate') {
+              return caches.match('index.html');
+            }
+          });
       })
   );
+});
+
+// Handle messages from the main thread
+self.addEventListener('message', event => {
+  if (event.data && event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
