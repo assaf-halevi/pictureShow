@@ -2,446 +2,149 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heart Popper Game</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simple Photo Search</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            overflow: hidden;
-            background: #f0f0f0;
+            font-family: Arial, sans-serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            min-height: 100vh;
-            touch-action: none;
-        }
-
-        canvas {
-            width: 100vw;
+            justify-content: center;
             height: 100vh;
-            display: block;
+            background-color: #fff;
+            overflow: hidden;
         }
-
-        .heart {
+        .search-container {
+            width: 90%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #dfe1e5;
+            border-radius: 24px;
+            outline: none;
+            box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
+        }
+        .image-container {
+            width: 90%;
+            max-width: 600px;
+            height: 60%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        #search-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .nav-button {
             position: absolute;
-            width: 80px;
-            height: 80px;
-            font-size: 80px;
-            line-height: 80px;
-            color: #ff69b4;
-            text-align: center;
-            touch-action: none;
-            filter: drop-shadow(0 0 8px rgba(255, 105, 180, 0.7));
-            user-select: none;
-            opacity: 0; /* Start with opacity 0 for fade-in effect */
-            transition: color 1s ease, opacity 1s ease, text-shadow 1s ease, filter 1s ease; /* Added filter to transition */
-            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; /* Black outline */
-        }
-
-        .popping {
-            transform: scale(2.5) rotate(720deg);
-            opacity: 0;
-            filter: drop-shadow(0 0 20px rgba(255, 105, 180, 1));
-            color: #ffb6c1;
-            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55), opacity 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-        }
-        
-        .fading {
-            color: white !important;
-            opacity: 0;
-            filter: drop-shadow(0 0 0px rgba(255, 105, 180, 0)) !important; /* Fade out the glow too */
-            text-shadow: -1px -1px 0 rgba(0,0,0,0), 1px -1px 0 rgba(0,0,0,0), -1px 1px 0 rgba(0,0,0,0), 1px 1px 0 rgba(0,0,0,0) !important; /* Fade out the outline too */
-            transition: color 1.5s ease, opacity 1.5s ease, text-shadow 1.5s ease, filter 1.5s ease;
-        }
-
-        #resetHeart {
-            position: absolute;
-            width: 150px;
-            height: 150px;
-            font-size: 150px;
-            line-height: 150px;
-            color: #ff1493;
-            text-align: center;
-            filter: drop-shadow(0 0 12px rgba(255, 20, 147, 0.8));
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 10px;
             cursor: pointer;
-            z-index: 10;
-            text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000; /* Black outline */
+            font-size: 18px;
+            border-radius: 50%;
+        }
+        #prev-button {
+            left: 10px;
+        }
+        #next-button {
+            right: 10px;
+        }
+        .nav-button:disabled {
+            background-color: rgba(0, 0, 0, 0.2);
+            cursor: not-allowed;
+        }
+        @media (max-width: 400px) {
+            input[type="text"] {
+                font-size: 14px;
+                padding: 8px;
+            }
+            .nav-button {
+                padding: 8px;
+                font-size: 16px;
+            }
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="resetHeart">♥</div>
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="Search for images..." onkeypress="if(event.key === 'Enter') searchImages()">
+    </div>
+    <div class="image-container">
+        <button id="prev-button" class="nav-button" onclick="prevImage()" disabled>&lt;</button>
+        <img id="search-image" src="" alt="Search result">
+        <button id="next-button" class="nav-button" onclick="nextImage()" disabled>&gt;</button>
+    </div>
 
     <script>
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        function playPopSound() {
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
-            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + 0.2);
-        }
-        
-        function playFartSound() {
-            // Create oscillator for the base sound
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            
-            // Create filter for the fart effect
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = "lowpass";
-            filter.frequency.value = 400;
-            filter.Q.value = 10;
-            
-            // Connect the nodes
-            oscillator.connect(filter);
-            filter.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            
-            // Hideous fart characteristics
-            oscillator.type = 'sawtooth';
-            
-            // Random starting frequency between 100-200Hz
-            const startFreq = 100 + Math.random() * 100;
-            oscillator.frequency.setValueAtTime(startFreq, audioCtx.currentTime);
-            
-            // Downward frequency slide
-            oscillator.frequency.exponentialRampToValueAtTime(
-                startFreq * 0.5, 
-                audioCtx.currentTime + 0.3 + Math.random() * 0.3
-            );
-            
-            // Volume envelope
-            gainNode.gain.setValueAtTime(0.01, audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.6, audioCtx.currentTime + 0.05);
-            
-            // Random volume fluctuations for the wet sound
-            for (let i = 0; i < 5; i++) {
-                const time = audioCtx.currentTime + 0.1 + (i * 0.07) + (Math.random() * 0.03);
-                gainNode.gain.setValueAtTime(0.1 + Math.random() * 0.5, time);
-            }
-            
-            // Final fade out
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
-            
-            // Filter modulation for the sputtering effect
-            filter.frequency.setValueAtTime(400, audioCtx.currentTime);
-            for (let i = 0; i < 6; i++) {
-                const time = audioCtx.currentTime + (i * 0.1) + (Math.random() * 0.05);
-                filter.frequency.exponentialRampToValueAtTime(
-                    200 + Math.random() * 700, 
-                    time
-                );
-            }
-            
-            // Play the sound
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + 1.0);
-        }
+        const UNSPLASH_ACCESS_KEY = 'YOUR_UNSPLASH_ACCESS_KEY'; // Replace with your Unsplash API key
+        let images = [];
+        let currentImageIndex = 0;
 
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const resetHeart = document.getElementById('resetHeart');
-        let resetting = false;
-        let isDragging = false; // Track if finger is dragging
+        async function searchImages() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            resetHeart.style.left = `${(window.innerWidth - 150) / 2}px`;
-            resetHeart.style.top = `${(window.innerHeight - 150) / 2}px`;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        class Heart {
-            constructor(x, y, index) {
-                this.x = x;
-                this.y = y;
-                this.originalX = x; // Store original position
-                this.originalY = y;
-                this.index = index;
-                this.speedX = (Math.random() - 0.5) * 3;
-                this.speedY = (Math.random() - 0.5) * 3;
-                this.opacity = 0; // Start with opacity 0 for fade-in effect
-                this.popping = false;
-                this.fading = false;
-                
-                // Even faster movement parameters
-                this.minSpeed = 0.08 + (Math.random() * 0.07); // Fast starting speed
-                this.maxSpeed = 0.25 + (Math.random() * 0.15);  // Fast max speed
-                
-                // Much larger offsets for better scattering
-                this.offsetX = (Math.random() - 0.5) * 200;
-                this.offsetY = (Math.random() - 0.5) * 200;
-                
-                // Unique personality for each heart
-                this.scatterFactor = 0.6 + (Math.random() * 0.8); // How much this heart likes to scatter
-                this.attractionFactor = 0.6 + (Math.random() * 0.8); // How attracted this heart is to the finger
-                
-                // Unique angle for orbit-like movements
-                this.orbitAngle = Math.random() * Math.PI * 2;
-                this.orbitSpeed = 0.1 + (Math.random() * 0.1); // Faster orbit speed
-
-                this.element = document.createElement('div');
-                this.element.className = 'heart';
-                this.element.style.left = `${this.x}px`;
-                this.element.style.top = `${this.y}px`;
-                this.element.innerHTML = '♥';
-                document.body.appendChild(this.element);
-
-                // Fade in effect
-                setTimeout(() => {
-                    this.element.style.opacity = '1';
-                }, 50 + index * 50); // Stagger the fade-in
-
-                this.element.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    if (!this.popping && !this.fading) {
-                        this.pop();
+            try {
+                const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=10`, {
+                    headers: {
+                        Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`
                     }
                 });
-            }
-
-            pop() {
-                this.popping = true;
-                this.element.classList.add('popping');
-                playPopSound();
-                setTimeout(() => {
-                    this.element.remove();
-                }, 800);
-            }
-
-            fadeOut() {
-                this.fading = true;
-                this.element.classList.add('fading');
-                // Don't remove the element - it will be invisible but still there
-            }
-
-            update(targetX, targetY) {
-                if (!this.popping && !this.fading) {
-                    if (targetX !== null && targetY !== null && isDragging) {
-                        // Only follow the finger if we're dragging, not just touching
-                        // Calculate distance to finger
-                        const dx = targetX - this.x;
-                        const dy = targetY - this.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        
-                        // Calculate speed - much faster at all distances
-                        let speedFactor;
-                        
-                        // Modified distance-based speed calculation for scatter effect
-                        if (distance > 250) { // Far away
-                            // Far away - moderate speed with high scatter
-                            speedFactor = this.minSpeed * this.attractionFactor;
-                        } else if (distance > 80) { // Medium distance - high scatter zone
-                            // Medium distance - faster but with significant scatter
-                            const distanceRatio = (distance - 80) / 170; // 0 at 80px, 1 at 250px
-                            
-                            // More scatter when further away, more direct movement when closer
-                            speedFactor = this.minSpeed + ((this.maxSpeed - this.minSpeed) * (1 - distanceRatio)) * this.attractionFactor;
-                        } else {
-                            // Very close - fastest speed with little scatter (blob-like behavior)
-                            speedFactor = this.maxSpeed * 1.5 * this.attractionFactor;
-                        }
-                        
-                        // Calculate target position with highly varied scatter based on distance
-                        let actualTargetX = targetX;
-                        let actualTargetY = targetY;
-                        
-                        if (distance < 80) { // Very close - tight orbit (blob)
-                            // Tight orbit when close
-                            this.orbitAngle += this.orbitSpeed;
-                            const orbitRadius = Math.max(20, distance * 0.3);
-                            
-                            actualTargetX += Math.cos(this.orbitAngle) * orbitRadius + this.offsetX * 0.1;
-                            actualTargetY += Math.sin(this.orbitAngle) * orbitRadius + this.offsetY * 0.1;
-                        } else if (distance < 250) { // Medium distance - high scatter
-                            // The scatter effect increases as distance increases from 80px to 250px
-                            const scatterRatio = (distance - 80) / 170; // 0 at 80px, 1 at 250px
-                            
-                            // Calculate scatter factor that increases with distance
-                            const dynamicScatterFactor = this.scatterFactor * scatterRatio * 1.5;
-                            
-                            // Apply increasing scatter effect
-                            actualTargetX += this.offsetX * dynamicScatterFactor;
-                            actualTargetY += this.offsetY * dynamicScatterFactor;
-                            
-                            // Add some oscillation for more natural movement
-                            actualTargetX += Math.sin(Date.now() * 0.001 + this.index) * 40 * scatterRatio;
-                            actualTargetY += Math.cos(Date.now() * 0.001 + this.index) * 40 * scatterRatio;
-                        } else { // Far away - moderate scatter
-                            // Less scatter when very far away to ensure they eventually reach the target
-                            actualTargetX += this.offsetX * 0.3 * this.scatterFactor;
-                            actualTargetY += this.offsetY * 0.3 * this.scatterFactor;
-                        }
-                        
-                        // Apply movement with varying speed based on distance
-                        this.x += (actualTargetX - this.x) * speedFactor;
-                        this.y += (actualTargetY - this.y) * speedFactor;
-                    } else {
-                        // When not being dragged, hearts gradually return to their original positions
-                        const dx = this.originalX - this.x;
-                        const dy = this.originalY - this.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        
-                        // Return speed varies based on distance from original position
-                        const returnSpeedFactor = 0.03 + (0.05 * (distance / 400)); // Faster return
-                        
-                        // Slowly return to original position
-                        this.x += dx * returnSpeedFactor;
-                        this.y += dy * returnSpeedFactor;
-                        
-                        // Add a bit of random movement
-                        this.x += (Math.random() - 0.5) * 1;
-                        this.y += (Math.random() - 0.5) * 1;
-                        
-                        // Keep within bounds
-                        if (this.x <= 0) {
-                            this.x = 0;
-                        } else if (this.x >= window.innerWidth - 80) {
-                            this.x = window.innerWidth - 80;
-                        }
-
-                        if (this.y <= 0) {
-                            this.y = 0;
-                        } else if (this.y >= window.innerHeight - 80) {
-                            this.y = window.innerHeight - 80;
-                        }
-                    }
-
-                    this.element.style.left = `${this.x}px`;
-                    this.element.style.top = `${this.y}px`;
-                }
+                const data = await response.json();
+                images = data.results.map(result => result.urls.regular);
+                currentImageIndex = 0;
+                updateImage();
+            } catch (error) {
+                console.error('Error fetching images:', error);
+                document.getElementById('search-image').src = '';
+                document.getElementById('search-image').alt = 'Error loading image';
             }
         }
 
-        let hearts = [];
-        const initialHeartCount = 15; // Increased number of hearts for better effect
-        let totalHeartsCreated = initialHeartCount;
-        let touchX = null;
-        let touchY = null;
+        function updateImage() {
+            const imageElement = document.getElementById('search-image');
+            const prevButton = document.getElementById('prev-button');
+            const nextButton = document.getElementById('next-button');
 
-        function spawnHeart(x, y, index) {
-            // Spawn hearts in random positions across the screen
-            const randomX = Math.random() * (window.innerWidth - 100) + 50;
-            const randomY = Math.random() * (window.innerHeight - 100) + 50;
-            const newHeart = new Heart(randomX, randomY, index);
-            hearts.push(newHeart);
-            totalHeartsCreated++;
-        }
-
-        function initializeHearts() {
-            if (resetting) return;
-            
-            resetting = true;
-            
-            // Play fart sound when resetting hearts
-            playFartSound();
-            
-            // First fade out all existing hearts
-            hearts.forEach(heart => heart.fadeOut());
-            
-            // Wait for fade out animation to complete
-            setTimeout(() => {
-                hearts.forEach(heart => heart.element.remove());
-                hearts = [];
-                totalHeartsCreated = initialHeartCount;
-                
-                // Distribute hearts across the screen
-                for (let i = 0; i < initialHeartCount; i++) {
-                    const x = Math.random() * (window.innerWidth - 100) + 50;
-                    const y = Math.random() * (window.innerHeight - 100) + 50;
-                    spawnHeart(x, y, i);
-                }
-                
-                resetting = false;
-            }, 1500); // Wait for fade out animation to complete
-        }
-
-        resetHeart.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            initializeHearts();
-        });
-
-        window.addEventListener('load', () => {
-            resizeCanvas();
-            initializeHearts();
-            enterFullScreen();
-        });
-
-        let lastSpawnTime = Date.now();
-        const spawnInterval = 3000; // Longer interval between spawns
-
-        function gameLoop() {
-            // Only filter out popped hearts, keep fading hearts
-            hearts = hearts.filter(heart => !heart.popping || heart.opacity > 0);
-            hearts.forEach((heart, index) => {
-                heart.index = index;
-                heart.update(touchX, touchY);
-            });
-
-            const currentTime = Date.now();
-            if (currentTime - lastSpawnTime >= spawnInterval && hearts.length < 20 && touchX === null && !resetting) {
-                spawnHeart(window.innerWidth / 2, window.innerHeight / 2, hearts.length);
-                lastSpawnTime = currentTime;
+            if (images.length === 0 || currentImageIndex >= images.length) {
+                imageElement.src = '';
+                imageElement.alt = 'No images found';
+                prevButton.disabled = true;
+                nextButton.disabled = true;
+                return;
             }
 
-            requestAnimationFrame(gameLoop);
+            imageElement.src = images[currentImageIndex];
+            imageElement.alt = 'Search result';
+            prevButton.disabled = currentImageIndex === 0;
+            nextButton.disabled = currentImageIndex === images.length - 1;
         }
 
-        gameLoop();
-
-        // Touch controls for interacting with hearts
-        document.addEventListener('touchstart', (e) => {
-            if (e.target === canvas || e.target.className.includes('heart')) {
-                e.preventDefault();
-                const touch = e.touches[0];
-                touchX = touch.clientX - 40; // Adjust for heart center
-                touchY = touch.clientY - 40;
-                isDragging = false; // Start with not dragging
+        function prevImage() {
+            if (currentImageIndex > 0) {
+                currentImageIndex--;
+                updateImage();
             }
-        }, { passive: false });
-
-        document.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            touchX = touch.clientX - 40;
-            touchY = touch.clientY - 40;
-            isDragging = true; // Now we are dragging
-        }, { passive: false });
-
-        document.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            touchX = null;
-            touchY = null;
-            isDragging = false; // Reset dragging state
-        }, { passive: false });
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(() => console.log('Service Worker Registered'))
-                .catch((error) => console.log('Registration failed:', error));
         }
 
-        function enterFullScreen() {
-            const elem = document.documentElement;
-            if (elem.requestFullscreen) {
-                elem.requestFullscreen();
-            } else if (elem.webkitRequestFullscreen) {
-                elem.webkitRequestFullscreen();
-            } else if (elem.msRequestFullscreen) {
-                elem.msRequestFullscreen();
+        function nextImage() {
+            if (currentImageIndex < images.length - 1) {
+                currentImageIndex++;
+                updateImage();
             }
         }
     </script>
