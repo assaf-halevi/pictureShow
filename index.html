@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon.png">
     <title>Pixabay Image Search</title>
@@ -15,8 +17,9 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            background-color: #fff;
+            background-color: #000;
             overflow: hidden;
+            color: #fff;
         }
         .search-container {
             width: 100%;
@@ -25,34 +28,50 @@
             position: fixed;
             top: 0;
             left: 0;
-            background-color: #fff;
+            background-color: rgba(0, 0, 0, 0.7);
             z-index: 10;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            backdrop-filter: blur(5px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
         input[type="text"] {
             width: 100%;
             padding: 10px;
             font-size: 16px;
-            border: 1px solid #dfe1e5;
+            border: 1px solid #555;
             border-radius: 24px;
             outline: none;
             box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
+            background-color: rgba(255, 255, 255, 0.9);
         }
-        .image-container {
-            width: 100vw;
-            height: calc(100vh - 80px);
+        .image-gallery {
+            width: 100%;
+            height: calc(100vh - 60px);
             margin-top: 60px;
+            position: relative;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
-            overflow: hidden;
         }
-        #search-image {
-            width: 100vw;
+        .image-carousel {
+            display: flex;
+            transition: transform 0.3s ease-out;
+            width: 100%;
             height: 100%;
+        }
+        .image-slide {
+            min-width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .image-slide img {
+            max-width: 100%;
+            max-height: 100%;
             object-fit: contain;
-            touch-action: pan-x;
         }
         .nav-button {
             position: absolute;
@@ -71,6 +90,11 @@
             align-items: center;
             justify-content: center;
             z-index: 5;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+        .nav-button:active {
+            opacity: 1;
         }
         #prev-button {
             left: 10px;
@@ -83,11 +107,16 @@
             cursor: not-allowed;
         }
         .error-message {
-            color: red;
+            color: #ff6b6b;
             font-size: 14px;
             margin-top: 10px;
             text-align: center;
             padding: 0 10px;
+            position: fixed;
+            bottom: 40px;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 10;
         }
         .attribution {
             position: fixed;
@@ -95,13 +124,13 @@
             width: 100%;
             text-align: center;
             font-size: 12px;
-            color: #333;
-            background-color: rgba(255, 255, 255, 0.8);
+            color: #ddd;
+            background-color: rgba(0, 0, 0, 0.7);
             padding: 5px;
             z-index: 10;
         }
         .attribution a {
-            color: #007bff;
+            color: #4dabf7;
             text-decoration: none;
         }
         #loading {
@@ -111,12 +140,32 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 16px;
-            color: #333;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 10px 20px;
+            color: #fff;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 15px 25px;
             border-radius: 5px;
             z-index: 20;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .page-indicator {
+            position: fixed;
+            bottom: 60px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding: 5px 0;
+            z-index: 10;
+        }
+        .page-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.5);
+            margin: 0 4px;
+            transition: background-color 0.3s ease;
+        }
+        .page-dot.active {
+            background-color: #fff;
         }
         @media (max-width: 400px) {
             input[type="text"] {
@@ -139,7 +188,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: #ffffff;
+            background-color: #000000;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -151,10 +200,16 @@
             width: 150px;
             height: 150px;
             margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
         .splash-text {
             font-size: 24px;
-            color: #333;
+            color: #fff;
             margin-top: 20px;
         }
     </style>
@@ -169,11 +224,16 @@
     <div class="search-container">
         <input type="text" id="search-input" placeholder="Search for images..." onkeypress="if(event.key === 'Enter') searchImages()">
     </div>
-    <div class="image-container">
+    
+    <div class="image-gallery">
+        <div id="image-carousel" class="image-carousel">
+            <!-- Images will be dynamically added here -->
+        </div>
         <button id="prev-button" class="nav-button" onclick="prevImage()" disabled>&lt;</button>
-        <img id="search-image" src="" alt="Search result">
         <button id="next-button" class="nav-button" onclick="nextImage()" disabled>&gt;</button>
     </div>
+    
+    <div id="page-indicator" class="page-indicator"></div>
     <div id="error-message" class="error-message"></div>
     <div id="attribution" class="attribution"></div>
     <div id="loading">Loading...</div>
@@ -184,9 +244,20 @@
         let images = [];
         let currentImageIndex = 0;
         let preloadedImages = {};
-
+        let carousel = null;
+        let slideWidth = 0;
+        let touchStartX = 0;
+        let touchEndX = 0;
+        let touchStartY = 0;
+        let touchMoveX = 0;
+        let isDragging = false;
+        let startTranslate = 0;
+        
         // Remove splash screen after 2 seconds
         window.addEventListener('load', () => {
+            // Go fullscreen for Android
+            enableFullscreen();
+            
             setTimeout(() => {
                 const splash = document.getElementById('splash-screen');
                 splash.style.opacity = '0';
@@ -194,7 +265,45 @@
                     splash.style.display = 'none';
                 }, 500);
             }, 2000);
+            
+            // Set up the carousel
+            carousel = document.getElementById('image-carousel');
+            updateSlideWidth();
+            
+            // Update dimensions on resize
+            window.addEventListener('resize', () => {
+                updateSlideWidth();
+                updateCarouselPosition(true);
+            });
         });
+        
+        // Enable fullscreen mode
+        function enableFullscreen() {
+            // Try to enter fullscreen mode for Android
+            const doc = window.document;
+            const docEl = doc.documentElement;
+    
+            const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen ||
+                                      docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+            
+            if (requestFullScreen && !doc.fullscreenElement && !doc.mozFullScreenElement &&
+                !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+                requestFullScreen.call(docEl);
+            }
+            
+            // Hide browser UI on Android
+            if (navigator.userAgent.match(/Android/i)) {
+                window.scrollTo(0, 1);
+            }
+        }
+        
+        // Update the slide width based on current window dimensions
+        function updateSlideWidth() {
+            slideWidth = window.innerWidth;
+            if (images.length > 0) {
+                updateCarouselPosition(true);
+            }
+        }
 
         // Register service worker for PWA functionality
         if ('serviceWorker' in navigator) {
@@ -210,19 +319,11 @@
         }
 
         // Handle image load errors
-        function handleImageError() {
+        function handleImageError(imageElement) {
             console.log('Image failed to load:', images[currentImageIndex]?.url || 'undefined');
-            // Skip to the next valid image
-            if (images.length > 0 && currentImageIndex < images.length - 1) {
-                currentImageIndex++;
-                updateImage();
-            } else {
-                document.getElementById('search-image').src = 'https://via.placeholder.com/800x600?text=No+Image+Available';
-                document.getElementById('search-image').alt = 'No image available';
-                document.getElementById('error-message').textContent = 'No valid images could be loaded. Try another search.';
-                document.getElementById('attribution').innerHTML = '';
-                document.getElementById('loading').style.display = 'none';
-            }
+            // Replace with placeholder
+            imageElement.src = 'https://via.placeholder.com/800x600?text=Error+Loading+Image';
+            imageElement.alt = 'Error loading image';
         }
 
         // Preload an image to check if it's valid
@@ -257,8 +358,7 @@
             // Validate query
             if (!query || query.length < 2) {
                 errorMessage.textContent = 'Please enter a valid search query (at least 2 characters)';
-                document.getElementById('search-image').src = '';
-                document.getElementById('search-image').alt = 'No query entered';
+                document.getElementById('image-carousel').innerHTML = '';
                 loading.style.display = 'none';
                 return;
             }
@@ -284,8 +384,11 @@
 
                 if (!data.hits || data.hits.length === 0) {
                     errorMessage.textContent = 'No images found for this query. Try a different search.';
-                    document.getElementById('search-image').src = 'https://via.placeholder.com/800x600?text=No+Images+Found';
-                    document.getElementById('search-image').alt = 'No images found';
+                    document.getElementById('image-carousel').innerHTML = `
+                        <div class="image-slide">
+                            <img src="https://via.placeholder.com/800x600?text=No+Images+Found" alt="No images found">
+                        </div>
+                    `;
                     loading.style.display = 'none';
                     return;
                 }
@@ -322,107 +425,317 @@
 
                 if (images.length === 0) {
                     errorMessage.textContent = 'No valid images found for this query. Try a different search.';
-                    document.getElementById('search-image').src = 'https://via.placeholder.com/800x600?text=No+Valid+Images';
-                    document.getElementById('search-image').alt = 'No valid images found';
+                    document.getElementById('image-carousel').innerHTML = `
+                        <div class="image-slide">
+                            <img src="https://via.placeholder.com/800x600?text=No+Valid+Images" alt="No valid images found">
+                        </div>
+                    `;
                     loading.style.display = 'none';
                     return;
                 }
 
+                // Create carousel slides
+                createCarouselSlides();
+                updateCarouselPosition(true);
+                updatePageIndicator();
                 errorMessage.textContent = `Found ${images.length} images`;
-                updateImage();
                 
-                // Preload next image if available
-                if (images.length > 1) {
-                    preloadImage(images[1].url);
-                }
+                // Update attribution
+                updateAttribution();
+                
+                // Preload adjacent images
+                preloadAdjacentImages();
                 
                 loading.style.display = 'none';
             } catch (error) {
                 console.error('Error fetching images:', error);
                 errorMessage.textContent = 'Error fetching images. Please try again later.';
-                document.getElementById('search-image').src = 'https://via.placeholder.com/800x600?text=Error+Loading+Image';
-                document.getElementById('search-image').alt = 'Error loading image';
+                document.getElementById('image-carousel').innerHTML = `
+                    <div class="image-slide">
+                        <img src="https://via.placeholder.com/800x600?text=Error+Loading+Image" alt="Error loading image">
+                    </div>
+                `;
                 loading.style.display = 'none';
             }
         }
-
-        function updateImage() {
-            const imageElement = document.getElementById('search-image');
+        
+        // Create slides for the carousel
+        function createCarouselSlides() {
+            carousel.innerHTML = '';
+            images.forEach((image, index) => {
+                const slide = document.createElement('div');
+                slide.className = 'image-slide';
+                
+                const img = document.createElement('img');
+                img.src = index === currentImageIndex ? image.url : '';
+                img.alt = 'Search result';
+                img.dataset.index = index;
+                img.dataset.src = image.url;
+                img.onerror = () => handleImageError(img);
+                
+                slide.appendChild(img);
+                carousel.appendChild(slide);
+            });
+            
+            // Set up touch events
+            setupTouchEvents();
+        }
+        
+        // Update the position of the carousel
+        function updateCarouselPosition(immediate = false) {
+            if (!carousel || images.length === 0) return;
+            
+            const translate = -currentImageIndex * slideWidth;
+            
+            if (immediate) {
+                carousel.style.transition = 'none';
+                carousel.style.transform = `translateX(${translate}px)`;
+                // Force reflow
+                carousel.offsetHeight;
+                carousel.style.transition = 'transform 0.3s ease-out';
+            } else {
+                carousel.style.transform = `translateX(${translate}px)`;
+            }
+            
+            // Load the current image if it's not loaded yet
+            const currentSlide = carousel.children[currentImageIndex];
+            if (currentSlide) {
+                const img = currentSlide.querySelector('img');
+                if (img && !img.src.includes(img.dataset.src)) {
+                    img.src = img.dataset.src;
+                }
+            }
+            
+            // Update buttons
             const prevButton = document.getElementById('prev-button');
             const nextButton = document.getElementById('next-button');
-            const errorMessage = document.getElementById('error-message');
-            const attribution = document.getElementById('attribution');
-            const loading = document.getElementById('loading');
-
-            if (images.length === 0 || currentImageIndex >= images.length) {
-                imageElement.src = 'https://via.placeholder.com/800x600?text=No+Image+Available';
-                imageElement.alt = 'No images found';
-                prevButton.disabled = true;
-                nextButton.disabled = true;
-                errorMessage.textContent = 'No valid images available';
-                attribution.innerHTML = '';
-                loading.style.display = 'none';
-                return;
-            }
-
-            // Set image source with onerror handler
-            imageElement.onerror = handleImageError;
-            imageElement.src = images[currentImageIndex].url;
-            imageElement.alt = 'Search result';
-            
-            // Update navigation buttons
             prevButton.disabled = currentImageIndex === 0;
             nextButton.disabled = currentImageIndex === images.length - 1;
-
-            // Add attribution
-            attribution.innerHTML = `
-                Photo by <a href="${images[currentImageIndex].source_url}" target="_blank">${images[currentImageIndex].source}</a> on <a href="https://pixabay.com" target="_blank">Pixabay</a>
-            `;
             
-            // Preload next image if available
+            // Update page indicator
+            updatePageIndicator();
+            
+            // Update attribution
+            updateAttribution();
+            
+            // Preload adjacent images
+            preloadAdjacentImages();
+        }
+        
+        // Preload adjacent images
+        function preloadAdjacentImages() {
+            if (images.length <= 1) return;
+            
+            // Preload the next image
             if (currentImageIndex < images.length - 1) {
-                preloadImage(images[currentImageIndex + 1].url);
+                const nextIndex = currentImageIndex + 1;
+                const nextSlide = carousel.children[nextIndex];
+                if (nextSlide) {
+                    const img = nextSlide.querySelector('img');
+                    if (img && !img.src.includes(img.dataset.src)) {
+                        preloadImage(img.dataset.src).then(isValid => {
+                            if (isValid) {
+                                img.src = img.dataset.src;
+                            }
+                        });
+                    }
+                }
             }
-            // Preload previous image if available
+            
+            // Preload the previous image
             if (currentImageIndex > 0) {
-                preloadImage(images[currentImageIndex - 1].url);
+                const prevIndex = currentImageIndex - 1;
+                const prevSlide = carousel.children[prevIndex];
+                if (prevSlide) {
+                    const img = prevSlide.querySelector('img');
+                    if (img && !img.src.includes(img.dataset.src)) {
+                        preloadImage(img.dataset.src).then(isValid => {
+                            if (isValid) {
+                                img.src = img.dataset.src;
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Update attribution text
+        function updateAttribution() {
+            const attribution = document.getElementById('attribution');
+            if (images.length > 0 && currentImageIndex < images.length) {
+                attribution.innerHTML = `
+                    Photo by <a href="${images[currentImageIndex].source_url}" target="_blank">${images[currentImageIndex].source}</a> on <a href="https://pixabay.com" target="_blank">Pixabay</a>
+                `;
+            } else {
+                attribution.innerHTML = '';
+            }
+        }
+        
+        // Update page indicator dots
+        function updatePageIndicator() {
+            const pageIndicator = document.getElementById('page-indicator');
+            pageIndicator.innerHTML = '';
+            
+            if (images.length <= 1) return;
+            
+            // Show max 7 dots to avoid clutter
+            const maxDots = 7;
+            let dotsToShow;
+            let startDot = 0;
+            
+            if (images.length <= maxDots) {
+                dotsToShow = images.length;
+            } else {
+                dotsToShow = maxDots;
+                startDot = Math.max(0, Math.min(currentImageIndex - Math.floor(maxDots / 2), images.length - maxDots));
+            }
+            
+            for (let i = 0; i < dotsToShow; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'page-dot';
+                if (startDot + i === currentImageIndex) {
+                    dot.classList.add('active');
+                }
+                pageIndicator.appendChild(dot);
             }
         }
 
         function prevImage() {
             if (currentImageIndex > 0) {
                 currentImageIndex--;
-                updateImage();
+                updateCarouselPosition();
             }
         }
 
         function nextImage() {
             if (currentImageIndex < images.length - 1) {
                 currentImageIndex++;
-                updateImage();
+                updateCarouselPosition();
             }
         }
 
-        // Swipe support for mobile devices
-        let touchStartX = 0;
-        let touchEndX = 0;
-
-        document.getElementById('search-image').addEventListener('touchstart', (e) => {
-            touchStartX = e.changedTouches[0].screenX;
-        }, { passive: true });
-
-        document.getElementById('search-image').addEventListener('touchend', (e) => {
-            touchEndX = e.changedTouches[0].screenX;
-            handleSwipe();
-        }, { passive: true });
-
-        function handleSwipe() {
-            const swipeThreshold = 50;
-            if (touchStartX - touchEndX > swipeThreshold) {
-                nextImage();
-            } else if (touchEndX - touchStartX > swipeThreshold) {
-                prevImage();
+        // Set up touch events for swiping
+        function setupTouchEvents() {
+            carousel.addEventListener('touchstart', handleTouchStart, { passive: true });
+            carousel.addEventListener('touchmove', handleTouchMove, { passive: false });
+            carousel.addEventListener('touchend', handleTouchEnd, { passive: true });
+            
+            // Add mouse events for desktop testing
+            carousel.addEventListener('mousedown', handleMouseDown);
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+        
+        function handleTouchStart(e) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            handleDragStart(touchStartX);
+        }
+        
+        function handleTouchMove(e) {
+            if (!isDragging) return;
+            
+            const touchX = e.touches[0].clientX;
+            const touchY = e.touches[0].clientY;
+            
+            // Determine if scroll is more horizontal than vertical
+            const deltaX = Math.abs(touchX - touchStartX);
+            const deltaY = Math.abs(touchY - touchStartY);
+            
+            if (deltaX > deltaY) {
+                e.preventDefault(); // Prevent page scrolling when swiping horizontally
+                handleDragMove(touchX);
+            } else {
+                // If more vertical than horizontal, end the drag to allow normal scrolling
+                isDragging = false;
+                updateCarouselPosition();
             }
+        }
+        
+        function handleTouchEnd(e) {
+            if (!isDragging) return;
+            
+            touchEndX = e.changedTouches[0].clientX;
+            handleDragEnd(touchEndX);
+        }
+        
+        function handleMouseDown(e) {
+            touchStartX = e.clientX;
+            handleDragStart(touchStartX);
+            e.preventDefault(); // Prevent text selection
+        }
+        
+        function handleMouseMove(e) {
+            if (!isDragging) return;
+            handleDragMove(e.clientX);
+            e.preventDefault(); // Prevent text selection
+        }
+        
+        function handleMouseUp(e) {
+            if (!isDragging) return;
+            touchEndX = e.clientX;
+            handleDragEnd(touchEndX);
+            e.preventDefault(); // Prevent text selection
+        }
+        
+        function handleDragStart(x) {
+            if (images.length <= 1) return;
+            
+            isDragging = true;
+            startTranslate = -currentImageIndex * slideWidth;
+            touchMoveX = x;
+            
+            // Disable transition for immediate response
+            carousel.style.transition = 'none';
+        }
+        
+        function handleDragMove(x) {
+            if (!isDragging) return;
+            
+            const diff = x - touchMoveX;
+            touchMoveX = x;
+            
+            // Calculate new position with resistance at edges
+            let newTranslate = startTranslate;
+            
+            // Apply the drag movement
+            newTranslate += diff;
+            
+            // Add resistance at the edges (first and last slide)
+            if (newTranslate > 0) {
+                // Past the first slide - apply resistance
+                newTranslate = newTranslate * 0.3;
+            } else if (newTranslate < -(images.length - 1) * slideWidth) {
+                // Past the last slide - apply resistance
+                const overscroll = newTranslate + (images.length - 1) * slideWidth;
+                newTranslate = -(images.length - 1) * slideWidth + (overscroll * 0.3);
+            }
+            
+            // Apply the translation
+            carousel.style.transform = `translateX(${newTranslate}px)`;
+        }
+        
+        function handleDragEnd(x) {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            // Enable transition for smooth animation
+            carousel.style.transition = 'transform 0.3s ease-out';
+            
+            // Calculate swipe distance
+            const swipeDistance = x - touchStartX;
+            const swipeThreshold = slideWidth * 0.2; // 20% of slide width
+            
+            if (swipeDistance < -swipeThreshold && currentImageIndex < images.length - 1) {
+                // Swiped left - next image
+                currentImageIndex++;
+            } else if (swipeDistance > swipeThreshold && currentImageIndex > 0) {
+                // Swiped right - previous image
+                currentImageIndex--;
+            }
+            
+            // Update carousel position
+            updateCarouselPosition();
         }
         
         // Add keyboard navigation
