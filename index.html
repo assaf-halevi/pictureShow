@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Openverse Image Search - Single Image Mode</title>
+    <title>Pixabay Image Search - Single Image Mode</title>
     <style>
         body {
             margin: 0;
@@ -93,6 +93,19 @@
             color: #007bff;
             text-decoration: none;
         }
+        #loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            color: #333;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 20;
+        }
         @media (max-width: 400px) {
             input[type="text"] {
                 font-size: 14px;
@@ -119,21 +132,26 @@
     </div>
     <div id="error-message" class="error-message"></div>
     <div id="attribution" class="attribution"></div>
+    <div id="loading">Loading...</div>
 
     <script>
+        // Pixabay API Key (replace with your own)
+        const PIXABAY_API_KEY = 'your_pixabay_api_key_here';
         let images = [];
         let currentImageIndex = 0;
 
-        // Handle image load errors (e.g., broken links)
+        // Handle image load errors
         function handleImageError() {
-            // Skip to the next image if the current one fails to load
+            console.log('Image failed to load:', images[currentImageIndex]?.url);
+            // Skip to the next image if available
             if (images.length > 0 && currentImageIndex < images.length - 1) {
                 nextImage();
             } else {
                 document.getElementById('search-image').src = '';
                 document.getElementById('search-image').alt = 'Image failed to load';
-                document.getElementById('error-message').textContent = 'Failed to load image. Try another search.';
+                document.getElementById('error-message').textContent = 'No images could be loaded. Try another search.';
                 document.getElementById('attribution').innerHTML = '';
+                document.getElementById('loading').style.display = 'none';
             }
         }
 
@@ -141,66 +159,72 @@
             const query = document.getElementById('search-input').value.trim();
             const errorMessage = document.getElementById('error-message');
             const attribution = document.getElementById('attribution');
+            const loading = document.getElementById('loading');
             errorMessage.textContent = '';
             attribution.innerHTML = '';
+            loading.style.display = 'block';
 
             if (!query) {
                 errorMessage.textContent = 'Please enter a search query';
                 document.getElementById('search-image').src = '';
                 document.getElementById('search-image').alt = 'No query entered';
+                loading.style.display = 'none';
                 return;
             }
 
-            images = [];
-            const maxPages = 1; // Fetch 1 page (100 images) for simplicity
-            let page = 1;
+            if (!PIXABAY_API_KEY || PIXABAY_API_KEY === 'your_pixabay_api_key_here') {
+                errorMessage.textContent = 'Please provide a valid Pixabay API key';
+                loading.style.display = 'none';
+                return;
+            }
 
             try {
-                while (images.length < 100 && page <= maxPages) {
-                    const response = await fetch(
-                        `https://api.openverse.engineering/v1/images/?q=${encodeURIComponent(query)}&license_type=zero&per_page=100&page=${page}`,
-                        {
-                            method: 'GET'
-                        }
-                    );
-
-                    if (!response.ok) {
-                        throw new Error(`API error: ${response.status} ${response.statusText}`);
+                const response = await fetch(
+                    `https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(query)}&image_type=photo&per_page=100`,
+                    {
+                        method: 'GET'
                     }
+                );
 
-                    const data = await response.json();
-                    if (!data.results || data.results.length === 0) {
-                        break; // No more results
+                if (!response.ok) {
+                    if (response.status === 403) {
+                        errorMessage.textContent = 'Invalid Pixabay API key. Please check your key.';
+                    } else {
+                        errorMessage.textContent = `API error: ${response.status} ${response.statusText}`;
                     }
-
-                    const newImages = data.results
-                        .filter(item => item.url) // Filter out invalid URLs
-                        .map(item => ({
-                            url: item.url,
-                            source: item.attribution || 'Openverse',
-                            source_url: item.url || 'https://openverse.org'
-                        }));
-
-                    images = images.concat(newImages);
-                    page++;
+                    loading.style.display = 'none';
+                    return;
                 }
 
+                const data = await response.json();
+                images = data.hits
+                    .filter(item => item.largeImageURL) // Ensure valid image URL
+                    .map(item => ({
+                        url: item.largeImageURL,
+                        source: item.user || 'Pixabay',
+                        source_url: item.pageURL || 'https://pixabay.com'
+                    }));
+
+                console.log('Fetched images:', images);
                 currentImageIndex = 0;
 
                 if (images.length === 0) {
                     errorMessage.textContent = 'No images found for this query';
                     document.getElementById('search-image').src = '';
                     document.getElementById('search-image').alt = 'No images found';
+                    loading.style.display = 'none';
                     return;
                 }
 
                 errorMessage.textContent = `Found ${images.length} images`;
                 updateImage();
+                loading.style.display = 'none';
             } catch (error) {
                 console.error('Error fetching images:', error);
                 errorMessage.textContent = 'Error fetching images. Please try again later.';
                 document.getElementById('search-image').src = '';
                 document.getElementById('search-image').alt = 'Error loading image';
+                loading.style.display = 'none';
             }
         }
 
@@ -210,6 +234,7 @@
             const nextButton = document.getElementById('next-button');
             const errorMessage = document.getElementById('error-message');
             const attribution = document.getElementById('attribution');
+            const loading = document.getElementById('loading');
 
             if (images.length === 0 || currentImageIndex >= images.length) {
                 imageElement.src = '';
@@ -218,6 +243,7 @@
                 nextButton.disabled = true;
                 errorMessage.textContent = 'No images available';
                 attribution.innerHTML = '';
+                loading.style.display = 'none';
                 return;
             }
 
@@ -228,7 +254,7 @@
 
             // Add attribution
             attribution.innerHTML = `
-                Image from <a href="${images[currentImageIndex].source_url}" target="_blank">${images[currentImageIndex].source}</a>
+                Photo by <a href="${images[currentImageIndex].source_url}" target="_blank">${images[currentImageIndex].source}</a> on <a href="https://pixabay.com" target="_blank">Pixabay</a>
             `;
         }
 
